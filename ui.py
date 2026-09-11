@@ -38,7 +38,7 @@ C_MUTED  = "#ff3366"
 class JarvisUI:
     def __init__(self, face_path, size=None):
         self.root = tk.Tk()
-        self.root.title("J.A.R.V.I.S — MARK XXXVII")
+        self.root.title("J.A.R.V.I.S PRO ULTRA")
         self.root.resizable(False, False)
 
         sw = self.root.winfo_screenwidth()
@@ -518,7 +518,7 @@ class JarvisUI:
         c.create_text(W - 16, H - 14, fill=C_DIM, font=("Courier", 8),
                       text="[F4] MUTE", anchor="e")
         c.create_text(W // 2, H - 14, fill=C_DIM, font=("Courier", 8),
-                      text="FatihMakes Industries  ·  CLASSIFIED  ·  MARK XXXVII")
+                      text="JARVIS PRO ULTRA  ·  CLASSIFIED  ·  ANDRÉ EDITION")
 
 
     # ── Rosto holográfico animado ─────────────────────────────────
