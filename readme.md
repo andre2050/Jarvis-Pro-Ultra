@@ -1,15 +1,8 @@
-# 🤖 MARK XXXVII (37)
-### The Ultimate Cross-Platform Personal AI Assistant — By FatihMakes
-
-> 📺 **[Watch the full setup video on YouTube](https://www.youtube.com/watch?v=BhOsnGC_sAA)**
-
-A real-time voice AI that can hear, see, understand, and control your computer — on any OS. Supporting Windows, macOS, and Linux. Local execution. Zero subscriptions. Engineered for total autonomy.
-
----
+# 🤖 Jarvis Pro Ultra
 
 ## ✨ Overview
 
-MARK XXXVII is the most versatile evolution of the Jarvis project. It transforms your operating system into a living, breathing intelligent entity. Through natural voice commands, Mark 37 analyzes your screen, manages your files, and executes complex workflows across different environments.
+MARK XXXVII is the most versatile evolution of the Jarvis project. It transforms your operating system into a living, breathing intelligent entity. Through natural voice commands, Jarvis Pro Ultra analyzes your screen, manages your files, and executes complex workflows across different environments.
 
 It's not just an assistant — it's an extension of your digital life.
 
@@ -30,7 +23,7 @@ It's not just an assistant — it's an extension of your digital life.
 
 ---
 
-## 🆕 What's New in XXXVII
+##Jarvis Pro Ultra
 
 - 🐧🍎 **Cross-Platform Support** *(Experimental)* — Now runs on Windows, macOS, and Linux. Core features work across all platforms; some OS-specific tasks may vary during the testing phase.
 - 💤 **Graceful Shutdown** — Tell Jarvis to "Shut down" or "Close" and it exits the session properly.
@@ -74,10 +67,4 @@ Licensed under **[Creative Commons BY-NC 4.0](https://creativecommons.org/licens
 
 ## 👤 Connect with the Creator
 
-Engineered by an 18-year-old developer building a real JARVIS-style assistant.
-⭐ **Star the repository to support the journey to Mark 85.**
-
-| Platform | Link |
-|---|---|
-| YouTube | [@FatihMakes](https://www.youtube.com/@FatihMakes) |
-| Instagram | [@fatihmakes](https://www.instagram.com/fatihmakes) |
+Andre Luiz Lima Menezes 
