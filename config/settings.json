@@ -4,6 +4,6 @@
   "language": "pt-BR",
   "tool_timeout_seconds": 90,
   "max_reconnect_delay_seconds": 30,
-  "manifest_url": "",
+  "manifest_url": "https://github.com/andre2050/Jarvis-Pro-Ultra/releases/latest/download/update.json",
   "hologram_face": true
 }
