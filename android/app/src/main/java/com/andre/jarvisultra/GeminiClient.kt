@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * Tenta os modelos em ordem — se um foi aposentado (404), cai pro próximo.
  */
 object GeminiClient {
-    private val MODELS = listOf("gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash")
+    private val MODELS = listOf("gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash")
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
     private val http = OkHttpClient.Builder()
