@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "1.0.2"
+    const val APP_VERSION = "1.0.3"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -41,7 +41,7 @@ object JarvisBrain {
         for (round in 1..MAX_TOOL_ROUNDS) {
             val result = GeminiClient.turn(apiKey, systemPrompt(), contents, JarvisTools.declarations())
 
-            if (result.functionCalls.isEmpty()) {
+            if (result.functionCallParts.isEmpty()) {
                 if (result.text != null) {
                     contents.put(JSONObject()
                         .put("role", "model")
@@ -55,13 +55,14 @@ object JarvisBrain {
                 return TurnResult(result.text ?: "", contents, toolsUsed)
             }
 
-            // modelo pediu tools -> registra as chamadas e responde cada uma
+            // modelo pediu tools -> devolve as PARTES INTEIRAS (com thoughtSignature se houver)
             val callParts = JSONArray()
-            for (c in result.functionCalls) callParts.put(JSONObject().put("functionCall", c))
+            for (part in result.functionCallParts) callParts.put(part)
             contents.put(JSONObject().put("role", "model").put("parts", callParts))
 
             val responseParts = JSONArray()
-            for (c in result.functionCalls) {
+            for (part in result.functionCallParts) {
+                val c = part.getJSONObject("functionCall")
                 val name = c.optString("name")
                 val args = c.optJSONObject("args") ?: JSONObject()
                 val output = JarvisTools.execute(ctx, name, args)

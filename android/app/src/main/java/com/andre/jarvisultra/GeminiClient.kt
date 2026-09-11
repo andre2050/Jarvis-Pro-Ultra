@@ -13,9 +13,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Cliente do Gemini com function calling real (o mesmo protocolo do JARVIS desktop).
  * Tenta os modelos em ordem — se um foi aposentado (404), cai pro próximo.
+ * "gemini-flash-latest" é um alias que a própria Google mantém apontando pro
+ * flash mais atual, então ele vai primeiro pra sobreviver a trocas de nome.
  */
 object GeminiClient {
-    private val MODELS = listOf("gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash")
+    private val MODELS = listOf("gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash")
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
     private val http = OkHttpClient.Builder()
@@ -23,7 +25,13 @@ object GeminiClient {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    data class GeminiResult(val text: String?, val functionCalls: List<JSONObject>, val model: String)
+    /**
+     * [functionCallParts] são as partes CRUAS da resposta do modelo que contêm functionCall —
+     * preservam o campo thoughtSignature (exigido pelos modelos novos, ex: gemini-3.6-flash,
+     * ao devolver a chamada de função no histórico). Nunca reconstrua esse JSON à mão:
+     * sempre reenvie a parte inteira como veio.
+     */
+    data class GeminiResult(val text: String?, val functionCallParts: List<JSONObject>, val model: String)
 
     suspend fun turn(apiKey: String, systemPrompt: String, contents: JSONArray, tools: JSONArray?): GeminiResult {
         var lastError: IllegalStateException? = null
@@ -72,13 +80,14 @@ object GeminiClient {
                 }
                 val parts = candidates.getJSONObject(0).optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
                 val sb = StringBuilder()
-                val calls = mutableListOf<JSONObject>()
+                val callParts = mutableListOf<JSONObject>()
                 for (i in 0 until parts.length()) {
                     val p = parts.getJSONObject(i)
                     if (p.has("text")) sb.append(p.getString("text"))
-                    if (p.has("functionCall")) calls.add(p.getJSONObject("functionCall"))
+                    // guarda a PARTE INTEIRA (não só o functionCall) pra preservar thoughtSignature
+                    if (p.has("functionCall")) callParts.add(p)
                 }
-                GeminiResult(sb.toString().trim().ifEmpty { null }, calls, model)
+                GeminiResult(sb.toString().trim().ifEmpty { null }, callParts, model)
             }
         }
 }
