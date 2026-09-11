@@ -7,3 +7,11 @@ __pycache__/
 *.pyc
 logs/
 .DS_Store
+
+# build android — nunca commitar
+android/local.properties
+android/app/build/
+android/build/
+android/.gradle/
+android/*.jks
+android/**/*.jks
