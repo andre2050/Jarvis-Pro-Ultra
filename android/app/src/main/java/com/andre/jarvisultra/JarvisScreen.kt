@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
 
 data class ChatMessage(val role: String, val text: String)
 
@@ -75,6 +76,7 @@ fun JarvisApp() {
     var apiKeySaved by remember { mutableStateOf(SettingsStore.hasApiKey(ctx)) }
     var showSettings by remember { mutableStateOf(!apiKeySaved) }
     var updateInfo by remember { mutableStateOf<String?>(null) }
+    var testResult by remember { mutableStateOf<String?>(null) }
 
     val voice = remember {
         JarvisVoice(ctx).also { v ->
@@ -97,7 +99,11 @@ fun JarvisApp() {
 
     fun send() {
         val msg = input.trim()
-        if (msg.isEmpty() || isThinking || !apiKeySaved) return
+        if (msg.isEmpty() || isThinking) return
+        if (!apiKeySaved) {
+            messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — toque na engrenagem no topo, cole a chave e salve. Aí sim, às ordens.")
+            return
+        }
         input = ""
         messages = messages + ChatMessage("user", msg) + ChatMessage("model", "…")
         isThinking = true
@@ -241,6 +247,22 @@ fun JarvisApp() {
                         fontSize = 11.sp,
                         color = CyanDim
                     )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = {
+                        scope.launch {
+                            testResult = "testando…"
+                            testResult = try {
+                                val contents = JSONArray()
+                                    .put(JSONObject().put("role", "user")
+                                        .put("parts", JSONArray().put(JSONObject().put("text", "oi"))))
+                                val r = GeminiClient.turn(apiKeyInput.trim(), "Responda apenas: ok", contents, null)
+                                "\u2705 Chave OK! O Gemini (" + r.model + ") respondeu."
+                            } catch (e: Exception) { "\u274c " + (e.message ?: "falhou") }
+                        }
+                    }) { Text("Testar chave") }
+                    testResult?.let { tr ->
+                        Text(tr, fontSize = 12.sp, color = Cyan)
+                    }
                 }
             },
             confirmButton = {
