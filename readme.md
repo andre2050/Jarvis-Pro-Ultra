@@ -33,11 +33,7 @@ It's not just an assistant — it's an extension of your digital life.
 
 ---
 
-## ⚡ Quick Start
-
-```bash
-git clone https://github.com/FatihMakes/Jarvis-MK37.git
-cd Jarvis-MK37
+## ⚡ Quick Start
 pip install -r requirements.txt
 playwright install
 python main.py
