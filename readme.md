@@ -2,7 +2,7 @@
 
 ## ✨ Overview
 
-MARK XXXVII is the most versatile evolution of the Jarvis project. It transforms your operating system into a living, breathing intelligent entity. Through natural voice commands, Jarvis Pro Ultra analyzes your screen, manages your files, and executes complex workflows across different environments.
+Jarvis Pro Ultra is the most versatile evolution of the Jarvis project. It transforms your operating system into a living, breathing intelligent entity. Through natural voice commands, Jarvis Pro Ultra analyzes your screen, manages your files, and executes complex workflows across different environments.
 
 It's not just an assistant — it's an extension of your digital life.
 
