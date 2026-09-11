@@ -1,0 +1,9 @@
+{
+  "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
+  "voice": "Charon",
+  "language": "pt-BR",
+  "tool_timeout_seconds": 90,
+  "max_reconnect_delay_seconds": 30,
+  "manifest_url": "",
+  "hologram_face": true
+}

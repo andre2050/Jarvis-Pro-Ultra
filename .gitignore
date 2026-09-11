@@ -1,0 +1,9 @@
+# segredo — NUNCA commitar
+config/api_keys.json
+keys/ed25519_private.pem
+
+# build/lixo
+__pycache__/
+*.pyc
+logs/
+.DS_Store
