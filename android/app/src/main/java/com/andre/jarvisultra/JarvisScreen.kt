@@ -2,6 +2,9 @@ package com.andre.jarvisultra
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -94,6 +97,21 @@ fun JarvisApp() {
 
     LaunchedEffect(Unit) {
         suggestion = try { JarvisMemory.suggest(ctx) } catch (e: Exception) { null }
+    }
+
+    LaunchedEffect(apiKeySaved) {
+        if (apiKeySaved) {
+            val pedidas = mutableListOf<String>()
+            for (p in listOf(
+                android.Manifest.permission.CALL_PHONE,
+                android.Manifest.permission.READ_CONTACTS,
+                android.Manifest.permission.SEND_SMS,
+                android.Manifest.permission.READ_SMS
+            )) {
+                if (ContextCompat.checkSelfPermission(ctx, p) != PackageManager.PERMISSION_GRANTED) pedidas.add(p)
+            }
+            if (pedidas.isNotEmpty()) ActivityCompat.requestPermissions(ctx as Activity, pedidas.toTypedArray(), 77)
+        }
     }
 
     val stt = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->

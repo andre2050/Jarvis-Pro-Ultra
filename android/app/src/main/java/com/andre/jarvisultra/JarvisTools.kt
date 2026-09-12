@@ -76,7 +76,10 @@ object JarvisTools {
             .put("description", "Conta uma piada curta em português para levantar o humor do usuário.")
             .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject()))
 
-        return JSONArray().put(calc).put(hora).put(dev).put(piada).put(lembrar)
+        val r = JSONArray().put(calc).put(hora).put(dev).put(piada).put(lembrar)
+        val phone = JarvisPhoneTools.declarations()
+        for (i in 0 until phone.length()) r.put(phone.get(i))
+        return r
     }
 
     /** Executa uma tool chamada pelo Gemini. Retorna o resultado como string. */
@@ -87,7 +90,7 @@ object JarvisTools {
             "status_dispositivo" -> statusDispositivo(ctx)
             "piada" -> piadaAleatoria()
             "lembrar_fato" -> lembrarFato(ctx, args.getString("fato"))
-            else -> "tool desconhecida: $name"
+            else -> JarvisPhoneTools.execute(ctx, name, args) ?: "tool desconhecida: $name"
         }
     } catch (e: Exception) {
         "erro ao executar '$name': ${e.message}"
