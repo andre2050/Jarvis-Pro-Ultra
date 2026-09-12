@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "2.0.1"
+    const val APP_VERSION = "2.0.2"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """

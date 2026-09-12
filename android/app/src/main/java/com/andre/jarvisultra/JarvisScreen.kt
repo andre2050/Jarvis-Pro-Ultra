@@ -243,7 +243,7 @@ fun JarvisApp() {
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { if (apiKeySaved) showSettings = false },
-            title = { Text("Configuração do JARVIS") },
+            title = { Text("Configuração do JARVIS (v" + JarvisBrain.APP_VERSION + ")") },
             text = {
                 Column {
                     Text("Cole sua chave do Google AI Studio (fica só neste dispositivo):", fontSize = 13.sp)

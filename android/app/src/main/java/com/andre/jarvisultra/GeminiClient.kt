@@ -2,20 +2,26 @@ package com.andre.jarvisultra
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 /**
  * Cliente do Gemini com function calling real (o mesmo protocolo do JARVIS desktop).
  * Tenta os modelos em ordem — se um foi aposentado (404), cai pro próximo.
- * "gemini-flash-latest" é um alias que a própria Google mantém apontando pro
- * flash mais atual, então ele vai primeiro pra sobreviver a trocas de nome.
+ * Se o DNS do sistema falhar ("Unable to resolve host"), consulta os servidores
+ * públicos diretamente por UDP (FallbackDns).
  */
 object GeminiClient {
     private val MODELS = listOf("gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash")
@@ -24,28 +30,35 @@ object GeminiClient {
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .dns(FallbackDns)
         .build()
 
     /**
      * [functionCallParts] são as partes CRUAS da resposta do modelo que contêm functionCall —
      * preservam o campo thoughtSignature (exigido pelos modelos novos, ex: gemini-3.6-flash,
-     * ao devolver a chamada de função no histórico). Nunca reconstrua esse JSON à mão:
-     * sempre reenvie a parte inteira como veio.
+     * ao devolver a chamada de função no histórico). Sempre reenvie a parte inteira como veio.
      */
     data class GeminiResult(val text: String?, val functionCallParts: List<JSONObject>, val model: String)
 
     suspend fun turn(apiKey: String, systemPrompt: String, contents: JSONArray, tools: JSONArray?): GeminiResult {
         var lastError: IllegalStateException? = null
         for (m in MODELS) {
-            try {
-                return callModel(m, apiKey, systemPrompt, contents, tools)
-            } catch (e: IllegalStateException) {
-                val msg = e.message ?: ""
-                if (msg.contains("404") || msg.contains("not found", ignoreCase = true) || msg.contains("not supported", ignoreCase = true)) {
-                    lastError = e
-                    continue
+            for (attempt in 1..2) {
+                try {
+                    return callModel(m, apiKey, systemPrompt, contents, tools)
+                } catch (e: UnknownHostException) {
+                    if (attempt == 2) {
+                        throw IllegalStateException("⚠️ Sem conexão com a internet, senhor. Verifique o Wi-Fi/dados móveis e tente de novo.")
+                    }
+                    kotlinx.coroutines.delay(1200)
+                } catch (e: IllegalStateException) {
+                    val msg = e.message ?: ""
+                    if (msg.contains("404") || msg.contains("not found", ignoreCase = true) || msg.contains("not supported", ignoreCase = true)) {
+                        lastError = e
+                        break
+                    }
+                    throw e
                 }
-                throw e
             }
         }
         throw lastError ?: IllegalStateException("nenhum modelo disponível")
@@ -69,8 +82,8 @@ object GeminiClient {
                 if (!resp.isSuccessful) {
                     val msg = try {
                         val err = JSONObject(txt).getJSONObject("error").getString("message")
-                        "\u26a0\ufe0f Gemini respondeu " + resp.code + ": " + err
-                    } catch (_: Exception) { "\u26a0\ufe0f Gemini respondeu " + resp.code }
+                        "⚠️ Gemini respondeu " + resp.code + ": " + err
+                    } catch (_: Exception) { "⚠️ Gemini respondeu " + resp.code }
                     throw IllegalStateException(msg)
                 }
                 val candidates = JSONObject(txt).optJSONArray("candidates")
@@ -85,10 +98,78 @@ object GeminiClient {
                 for (i in 0 until parts.length()) {
                     val p = parts.getJSONObject(i)
                     if (p.has("text")) sb.append(p.getString("text"))
-                    // guarda a PARTE INTEIRA (não só o functionCall) pra preservar thoughtSignature
                     if (p.has("functionCall")) callParts.add(p)
                 }
                 GeminiResult(sb.toString().trim().ifEmpty { null }, callParts, model)
             }
         }
+}
+
+/**
+ * Rede de segurança de DNS: usa o resolvedor do sistema; se ele falhar
+ * (UnknownHostException / "Unable to resolve host"), monta um pacote de
+ * consulta DNS na mão e pergunta direto pros servidores públicos.
+ */
+object FallbackDns : Dns {
+    override fun lookup(hostname: String): List<InetAddress> = try {
+        Dns.SYSTEM.lookup(hostname)
+    } catch (e: UnknownHostException) {
+        udpLookup(hostname)
+    }
+
+    private fun udpLookup(hostname: String): List<InetAddress> {
+        val name = hostname.trimEnd('.')
+        for (srv in listOf("8.8.8.8", "8.8.4.4", "1.1.1.1")) {
+            try {
+                val id = Random.nextInt(65536)
+                val q = ByteArrayOutputStream()
+                q.write(byteArrayOf(((id shr 8) and 0xFF).toByte(), (id and 0xFF).toByte(),
+                    0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
+                for (label in name.split('.')) {
+                    val bs = label.toByteArray(Charsets.US_ASCII)
+                    if (bs.isEmpty() || bs.size > 63) throw UnknownHostException(hostname)
+                    q.write(bs.size)
+                    q.write(bs)
+                }
+                q.write(0)
+                q.write(byteArrayOf(0x00, 0x01, 0x00, 0x01))
+                val pkt = q.toByteArray()
+                DatagramSocket().use { s ->
+                    s.soTimeout = 3000
+                    s.send(DatagramPacket(pkt, pkt.size, InetAddress.getByName(srv), 53))
+                    val buf = ByteArray(2048)
+                    val rp = DatagramPacket(buf, buf.size)
+                    s.receive(rp)
+                    val ips = parseA(buf)
+                    if (ips.isNotEmpty()) return ips.map { InetAddress.getByAddress(it) }
+                }
+            } catch (_: Exception) { /* tenta o próximo servidor */ }
+        }
+        throw UnknownHostException(hostname)
+    }
+
+    private fun parseA(b: ByteArray): List<ByteArray> {
+        if (b.size < 12) return emptyList()
+        val anCount = ((b[6].toInt() and 0xFF) shl 8) or (b[7].toInt() and 0xFF)
+        var i = 12
+        while (i < b.size && b[i] != 0.toByte()) i += (b[i].toInt() and 0xFF) + 1
+        i += 5
+        val ips = mutableListOf<ByteArray>()
+        repeat(anCount) {
+            if (i >= b.size) return@repeat
+            if (i < b.size && (b[i].toInt() and 0xC0) == 0xC0) {
+                i += 2
+            } else {
+                while (i < b.size && b[i] != 0.toByte()) i += (b[i].toInt() and 0xFF) + 1
+                i++
+            }
+            if (i + 10 > b.size) return@repeat
+            val type = ((b[i].toInt() and 0xFF) shl 8) or (b[i + 1].toInt() and 0xFF)
+            val rdlen = ((b[i + 8].toInt() and 0xFF) shl 8) or (b[i + 9].toInt() and 0xFF)
+            i += 10
+            if (type == 1 && rdlen == 4 && i + 4 <= b.size) ips.add(b.copyOfRange(i, i + 4))
+            i += rdlen
+        }
+        return ips
+    }
 }
