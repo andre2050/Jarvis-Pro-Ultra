@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "1.0.3"
+    const val APP_VERSION = "2.0.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -36,10 +36,17 @@ object JarvisBrain {
             .put("role", "user")
             .put("parts", JSONArray().put(JSONObject().put("text", userMessage))))
 
+        JarvisMemory.ensure(ctx)
+        JarvisMemory.logInteraction(ctx, "chat", userMessage.take(80))
+
+        val mems = JarvisMemory.search(ctx, userMessage)
+        val prompt = if (mems.isEmpty()) systemPrompt() else
+            systemPrompt() + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
+
         val toolsUsed = mutableListOf<String>()
 
         for (round in 1..MAX_TOOL_ROUNDS) {
-            val result = GeminiClient.turn(apiKey, systemPrompt(), contents, JarvisTools.declarations())
+            val result = GeminiClient.turn(apiKey, prompt, contents, JarvisTools.declarations())
 
             if (result.functionCallParts.isEmpty()) {
                 if (result.text != null) {
@@ -66,6 +73,7 @@ object JarvisBrain {
                 val name = c.optString("name")
                 val args = c.optJSONObject("args") ?: JSONObject()
                 val output = JarvisTools.execute(ctx, name, args)
+                JarvisMemory.logInteraction(ctx, name, output.take(80))
                 toolsUsed.add(name)
                 responseParts.put(JSONObject()
                     .put("functionResponse", JSONObject()

@@ -49,12 +49,34 @@ object JarvisTools {
             .put("description", "Mostra modelo, versão do Android, bateria e memória disponível do dispositivo.")
             .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject()))
 
+        val lembrar = JSONObject()
+            .put("name", "lembrar_fato")
+            .put(
+                "description",
+                "Guarda um fato permanente sobre o usu\u00e1rio na mem\u00f3ria de longo prazo do JARVIS. Use quando ele pedir para lembrar/guardar informa\u00e7\u00e3o (prefer\u00eancias, nomes, compromissos, rotinas)."
+            )
+            .put(
+                "parameters",
+                JSONObject()
+                    .put("type", "object")
+                    .put(
+                        "properties",
+                        JSONObject().put(
+                            "fato",
+                            JSONObject()
+                                .put("type", "string")
+                                .put("description", "O fato em uma frase curta, ex: 'a reuniao do Andre e sexta as 15h'")
+                        )
+                    )
+                    .put("required", JSONArray().put("fato"))
+            )
+
         val piada = JSONObject()
             .put("name", "piada")
             .put("description", "Conta uma piada curta em português para levantar o humor do usuário.")
             .put("parameters", JSONObject().put("type", "object").put("properties", JSONObject()))
 
-        return JSONArray().put(calc).put(hora).put(dev).put(piada)
+        return JSONArray().put(calc).put(hora).put(dev).put(piada).put(lembrar)
     }
 
     /** Executa uma tool chamada pelo Gemini. Retorna o resultado como string. */
@@ -64,6 +86,7 @@ object JarvisTools {
             "hora_e_data" -> horaEData()
             "status_dispositivo" -> statusDispositivo(ctx)
             "piada" -> piadaAleatoria()
+            "lembrar_fato" -> lembrarFato(ctx, args.getString("fato"))
             else -> "tool desconhecida: $name"
         }
     } catch (e: Exception) {
@@ -101,6 +124,11 @@ object JarvisTools {
     )
 
     private fun piadaAleatoria(): String = piadas[Random.nextInt(piadas.size)]
+
+    private fun lembrarFato(ctx: Context, fato: String): String {
+        JarvisMemory.remember(ctx, fato)
+        return "fato guardado na memoria permanente do JARVIS: '$fato'"
+    }
 
     // ---------- parser matemático seguro (sem eval) ----------
 

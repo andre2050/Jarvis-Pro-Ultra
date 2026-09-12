@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,7 @@ fun JarvisApp() {
     var showSettings by remember { mutableStateOf(!apiKeySaved) }
     var updateInfo by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
 
     val voice = remember {
         JarvisVoice(ctx).also { v ->
@@ -90,6 +92,10 @@ fun JarvisApp() {
     val history = remember { JSONArray() }
     val listState = rememberLazyListState()
 
+    LaunchedEffect(Unit) {
+        suggestion = try { JarvisMemory.suggest(ctx) } catch (e: Exception) { null }
+    }
+
     val stt = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         if (res.resultCode == Activity.RESULT_OK) {
             val text = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -97,8 +103,9 @@ fun JarvisApp() {
         }
     }
 
-    fun send() {
-        val msg = input.trim()
+    fun send(forced: String? = null) {
+        val msg = (forced ?: input).trim()
+        suggestion = null
         if (msg.isEmpty() || isThinking) return
         if (!apiKeySaved) {
             messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — toque na engrenagem no topo, cole a chave e salve. Aí sim, às ordens.")
@@ -193,6 +200,14 @@ fun JarvisApp() {
             tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
         ) {
+            suggestion?.let { s ->
+                TextButton(
+                    onClick = { suggestion = null; send(s.message) },
+                    modifier = Modifier.padding(start = 6.dp, top = 2.dp)
+                ) {
+                    Text(s.label, fontSize = 12.sp, color = CyanDim)
+                }
+            }
             Row(
                 Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
