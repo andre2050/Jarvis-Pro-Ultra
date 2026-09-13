@@ -9,6 +9,7 @@ Requer:       pip install -r requirements.txt
 """
 import queue
 import sys
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
@@ -176,11 +177,11 @@ class JarvisApp(tk.Tk):
 
     def _pulsar_chip(self):
         import time
-        cores = [RED_DIM, "#c4231a", RED, "#c4231a"]
+        cores = [self.cor("dim"), "#c4231a", self.cor("principal"), "#c4231a"]
         estagio = int(time.time() * 2) % len(cores)
         self.chip.delete("all")
         self.chip.create_oval(8, 9, 20, 21, fill=cores[estagio], outline="")
-        self.chip.create_text(62, 15, text=self._chip_texto, fill=TXT_FRACO,
+        self.chip.create_text(62, 15, text=self._chip_texto, fill=self.cor("txt_fraco"),
                               font=("Consolas", 9, "bold"))
         self.after(500, self._pulsar_chip)
 
@@ -424,7 +425,7 @@ class JarvisApp(tk.Tk):
         ligado = self.voz.alternar()
         config.save(self.cfg)
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if ligado else 'OFF'}",
-                            fg=self.cor("vivo") if ligado else TXT_FRACO)
+                            fg=self.cor("vivo") if ligado else self.cor("txt_fraco"))
         if not ligado:
             self.voz.falar("Voz desativada, senhor.")
 
@@ -444,7 +445,7 @@ class JarvisApp(tk.Tk):
         self.voz.config = self.cfg
         self.voz.enabled = bool(self.cfg.get("voz_ativa", True))
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if self.voz.enabled else 'OFF'}",
-                            fg=self.cor("vivo") if self.voz.enabled else TXT_FRACO)
+                            fg=self.cor("vivo") if self.voz.enabled else self.cor("txt_fraco"))
         self._atualiza_botao_wake()
 
     def _sair(self):
@@ -459,5 +460,23 @@ class JarvisApp(tk.Tk):
 
 
 if __name__ == "__main__":
-    app = JarvisApp()
-    app.mainloop()
+    try:
+        app = JarvisApp()
+        app.mainloop()
+    except Exception as e:
+        # nunca mais fecha em silêncio: loga o erro e mostra na tela
+        import traceback
+        from datetime import datetime as _dt
+        log = config.CONFIG_DIR / "erro.log"
+        try:
+            log.parent.mkdir(parents=True, exist_ok=True)
+            log.write_text(f"J.A.R.V.I.S v{__version__} caiu em {_dt.now()}\n\n"
+                           + traceback.format_exc(), encoding="utf-8")
+        except Exception:
+            log = None
+        try:
+            messagebox.showerror("J.A.R.V.I.S — erro",
+                                 f"O sistema caiu, senhor.\n\n{e}\n\n"
+                                 + (f"Log salvo em:\n{log}" if log else "Nao consegui salvar o log."))
+        except Exception:
+            pass

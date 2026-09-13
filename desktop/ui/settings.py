@@ -251,7 +251,8 @@ class PainelConfig(tk.Toplevel):
                     self.after(0, lambda: self.lbl_ollama.config(
                         text="Ollama não encontrado. Instale em ollama.com, depois `ollama pull llama3.2`"))
             except Exception as e:
-                self.after(0, lambda: self.lbl_ollama.config(text=f"erro: {e}"))
+                erro_txt = str(e)
+                self.after(0, lambda: self.lbl_ollama.config(text=f"erro: {erro_txt}"))
         threading.Thread(target=run, daemon=True).start()
 
     def _mostra_ollama(self, modelos: list):
@@ -297,7 +298,6 @@ class PainelConfig(tk.Toplevel):
 
     def _apagar_todas_memorias(self):
         from core import memory as mem
-        from tkinter import messagebox
         if messagebox.askyesno("J.A.R.V.I.S", "Apagar TODAS as memórias de longo prazo?",
                                parent=self, icon="warning"):
             mem.limpar()

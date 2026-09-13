@@ -84,7 +84,7 @@ class ChatPanel(tk.Frame):
             return None
         quem = {"user": "VOCÊ", "jarvis": "J.A.R.V.I.S", "erro": "ERRO"}
         with open(caminho, "w", encoding="utf-8") as f:
-            f.write(f"Conversa com J.A.R.V.I.S — Pro Ultra Desktop\n"
+            f.write("Conversa com J.A.R.V.I.S — Pro Ultra Desktop\n"
                     f"Exportada em {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
                     + "=" * 50 + "\n\n")
             for papel, hora, msg in self.transcricao:
@@ -93,8 +93,6 @@ class ChatPanel(tk.Frame):
 
     def mostrar_digitando(self) -> None:
         self.esconder_digitando()
-        if papel in ("user", "jarvis", "erro"):
-            self.transcricao.append((papel, hora, msg))
         self.texto.configure(state=tk.NORMAL)
         self._marcador_digitando = self.texto.index(tk.END + "-1c")
         self.texto.insert(tk.END, f"J.A.R.V.I.S está pensando ···\n", "jarvis_hora")
