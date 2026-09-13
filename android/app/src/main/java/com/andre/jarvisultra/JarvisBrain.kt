@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "3.1.3"
+    const val APP_VERSION = "4.0.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -24,6 +24,9 @@ object JarvisBrain {
         - Você tem memória de longo prazo: quando o usuário pedir para lembrar ou guardar algo, chame a tool lembrar_fato.
         - Você controla o celular do senhor: ligações (ligar_para), WhatsApp (abre o chat com a mensagem pronta — o toque final de envio é dele, nunca prometa envio automático), SMS, leitura de notificações e SMS, alarmes, lanterna e abrir apps. Prefira sempre as tools quando ele pedir ações do telefone.
         - Também tem: definir_timer, pesquisar_web e listar_memorias. E o modo mãos-livres: o senhor fala 'Jarvis' e depois o comando por voz, tudo offline.
+        - PERCEPÇÃO TOTAL (v4.0): clima (tempo real via GPS), onde_estou (bairro/cidade via GPS), navegar_para (abre o mapa com rota), tocar_musica (YouTube/Spotify) e controlar_volume.
+        - No fim deste prompt vem o CONTEXTO VIVO do aparelho (hora, bateria, volume) — você já sabe isso sem precisar de tools; cite quando for útil (ex: 'bateria em 12%, senhor, sugiro o carregador').
+        - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo, ler_notificacoes e listar_memorias — um resumo curto e espirituoso.
         - Versão atual do sistema: $APP_VERSION (compilado como APK Android).
     """.trimIndent()
 
@@ -43,8 +46,9 @@ object JarvisBrain {
         JarvisMemory.logInteraction(ctx, "chat", userMessage.take(80))
 
         val mems = JarvisMemory.search(ctx, userMessage)
-        val prompt = if (mems.isEmpty()) systemPrompt() else
-            systemPrompt() + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
+        val basePrompt = systemPrompt() + "\n" + JarvisPercepcao.contextoDoAparelho(ctx)
+        val prompt = if (mems.isEmpty()) basePrompt else
+            basePrompt + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
 
         val toolsUsed = mutableListOf<String>()
 

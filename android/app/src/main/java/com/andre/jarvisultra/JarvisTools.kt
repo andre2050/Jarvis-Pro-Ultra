@@ -79,6 +79,8 @@ object JarvisTools {
         val r = JSONArray().put(calc).put(hora).put(dev).put(piada).put(lembrar)
         val phone = JarvisPhoneTools.declarations()
         for (i in 0 until phone.length()) r.put(phone.get(i))
+        val percepcao = JarvisPercepcao.declarations()
+        for (i in 0 until percepcao.length()) r.put(percepcao.get(i))
         return r
     }
 
@@ -90,7 +92,9 @@ object JarvisTools {
             "status_dispositivo" -> statusDispositivo(ctx)
             "piada" -> piadaAleatoria()
             "lembrar_fato" -> lembrarFato(ctx, args.getString("fato"))
-            else -> JarvisPhoneTools.execute(ctx, name, args) ?: "tool desconhecida: $name"
+            else -> JarvisPercepcao.execute(ctx, name, args)
+                ?: JarvisPhoneTools.execute(ctx, name, args)
+                ?: "tool desconhecida: $name"
         }
     } catch (e: Exception) {
         "erro ao executar '$name': ${e.message}"

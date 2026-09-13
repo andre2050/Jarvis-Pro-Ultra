@@ -110,7 +110,8 @@ fun JarvisApp() {
                 android.Manifest.permission.CALL_PHONE,
                 android.Manifest.permission.READ_CONTACTS,
                 android.Manifest.permission.SEND_SMS,
-                android.Manifest.permission.READ_SMS
+                android.Manifest.permission.READ_SMS,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
             )) {
                 if (ContextCompat.checkSelfPermission(ctx, p) != PackageManager.PERMISSION_GRANTED) pedidas.add(p)
             }
