@@ -120,8 +120,9 @@ class PainelConfig(tk.Toplevel):
         sobre = (f"J.A.R.V.I.S — Pro Ultra Desktop v{__version__}\n"
                  "Cérebro Gemini · interface Reator de Arco Vermelho\n"
                  "Porte da v4.3.0 Android para Python desktop\n"
+                 "Fusão Mark LIII: wake word neural + 16 ações\n"
                  f"Repo: github.com/{GITHUB_REPO}\n"
-                 "Desenvolvedor: Andre Luiz Lima Menezes")
+                 "Desenvolvedor: André Luiz Lima Menezes")
         tk.Label(zona4, text=sobre, fg="#9c8a86", bg="#171012",
                  font=("Consolas", 9), justify=tk.LEFT).pack(anchor="w", padx=10, pady=8)
 

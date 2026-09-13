@@ -201,7 +201,7 @@ class JarvisApp(tk.Tk):
     def _boas_vindas(self):
         n_acoes = len(self.registro.names())
         self.chat.add("jarvis",
-                      "Sistemas online, senhor. Reator de arco operando a plena capacidade.")
+                      "Sistemas online, senhor André. Reator de arco operando a plena capacidade.")
         if n_acoes:
             self.chat.add("sistema", f"{n_acoes} ações do Mark LIII fundidas ao meu arsenal.")
         if not config.api_key_ok(self.cfg):
