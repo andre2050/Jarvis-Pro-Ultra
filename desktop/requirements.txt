@@ -1,0 +1,18 @@
+# J.A.R.V.I.S — Pro Ultra Desktop v4.3.0
+# Essenciais
+requests
+psutil
+
+# Voz (TTS offline) — opcional, o JARVIS degrada com elegância se faltar
+pyttsx3
+
+# Reconhecimento de fala — opcional (no Windows precisa do pyaudio)
+SpeechRecognition
+pyaudio
+
+# Busca na web sem abrir navegador — opcional
+duckduckgo-search
+
+# Controle fino de volume no Windows — opcional
+pycaw; platform_system == "Windows"
+comtypes; platform_system == "Windows"
