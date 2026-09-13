@@ -12,10 +12,16 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
 /**
- * Voz hands-free + offline (v3.0.0): rede neural Vosk de reconhecimento de fala
- * rodando DENTRO do aparelho. O senhor fala "Jarvis" e depois o comando — sem
- * apertar botão e sem precisar de internet pra escutar. O pacote de voz (31MB)
- * baixa uma vez só; se uma fonte falhar, tenta a outra.
+ * Voz hands-free + offline: rede neural Vosk de reconhecimento de fala rodando
+ * DENTRO do aparelho. O senhor fala "Jarvis" e depois o comando — sem apertar
+ * botão e sem precisar de internet pra escutar.
+ *
+ * Desde a v3.1.2 o pacote de voz (32MB) vem EMBUTIDO no APK (assets/vosk-model.zip):
+ * a instalação é local e instantânea. O download pela rede é só plano B.
+ *
+ * NOTA: este modelo (vosk-model-small-pt-0.3) é ACHATADO — os arquivos ficam na
+ * raiz (final.mdl, HCLr.fst…), sem as pastas clássicas am/conf/graph. O marcador
+ * de "instalado" é o final.mdl, não a pasta conf/.
  */
 object JarvisVosk {
     private val MODEL_URLS = listOf(
@@ -23,8 +29,10 @@ object JarvisVosk {
         "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"
     )
     private const val ZIP_PREFIX = "vosk-model-small-pt-0.3/"
+    /** Arquivo central do modelo — se existe, a instalação está completa. */
+    private const val SENTINEL = "final.mdl"
 
-    /** Mesma blindagem do chat: DNS de reserva + timeout generoso pra 31MB. */
+    /** Mesma blindagem do chat: DNS de reserva + timeout generoso. */
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
@@ -34,43 +42,32 @@ object JarvisVosk {
 
     fun modelDir(ctx: Context): File = File(ctx.filesDir, "vosk-model")
 
-    fun hasModel(ctx: Context): Boolean = File(modelDir(ctx), "conf").exists()
-
-    /** v3.1.1: o pacote de voz vem DENTRO do APK — copia dos assets pro armazenamento interno. */
-    private fun installFromAssets(ctx: Context): Boolean {
-        return try {
-            val dir = modelDir(ctx)
-            dir.deleteRecursively()
-            fun copiar(path: String) {
-                val itens = ctx.assets.list(path) ?: return
-                if (itens.isEmpty()) {
-                    val rel = path.removePrefix("vosk-model/")
-                    if (rel.isBlank()) return
-                    val f = File(dir, rel)
-                    f.parentFile?.mkdirs()
-                    ctx.assets.open(path).use { input -> f.outputStream().use { input.copyTo(it) } }
-                } else {
-                    itens.forEach { copiar(path + "/" + it) }
-                }
-            }
-            val raiz = ctx.assets.list("vosk-model") ?: return false
-            if (raiz.isEmpty()) return false
-            raiz.forEach { copiar("vosk-model/" + it) }
-            hasModel(ctx)
-        } catch (e: Exception) { false }
-    }
+    fun hasModel(ctx: Context): Boolean = File(modelDir(ctx), SENTINEL).exists()
 
     /**
-     * Baixa e instala o pacote de voz. Bloqueante — chamar fora da thread principal.
-     * Retorna null se ficou pronto, ou a mensagem de erro do que deu errado.
+     * Garante que o pacote de voz está instalado. Bloqueante — chamar fora da
+     * thread principal. Retorna null se pronto, ou mensagem do que deu errado.
      */
     fun ensureModel(ctx: Context, onProgress: (String) -> Unit = {}): String? {
         if (hasModel(ctx)) return null
-        // v3.1.1: instala direto do APK — instantâneo, sem depender de rede.
-        onProgress("instalando pacote de voz...")
-        if (installFromAssets(ctx)) return null
-        // Plano B (APK antigo / assets indisponíveis): download pela rede.
         val zip = File(ctx.cacheDir, "vosk-model.zip")
+
+        // 1) Instala direto do APK — sem rede, instantâneo.
+        onProgress("instalando pacote de voz...")
+        try {
+            ctx.assets.open("vosk-model.zip").use { input ->
+                zip.outputStream().use { input.copyTo(it) }
+            }
+            modelDir(ctx).deleteRecursively()
+            if (extrairZip(ctx, zip)) {
+                zip.delete()
+                return null
+            }
+        } catch (e: Exception) {
+            // assets indisponível — segue pro plano B
+        }
+
+        // 2) Plano B: download pela rede (APK antigo ou assets faltando).
         var ultimoErro: String? = null
         for (url in MODEL_URLS) {
             try {
@@ -95,7 +92,6 @@ object JarvisVosk {
                             read = input.read(buf)
                         }
                     }
-                    // Só considera OK se recebeu o total esperado (ou se o servidor não informou o tamanho).
                     contentOk = (total <= 0) || (done >= total)
                     if (!contentOk) ultimoErro = "conexão caiu no meio do download (recebido " + (done / 1024 / 1024) + "MB de " + (total / 1024 / 1024) + "MB)"
                 }
@@ -104,40 +100,39 @@ object JarvisVosk {
                     if (ultimoErro == null) ultimoErro = "download incompleto"
                     continue
                 }
-                onProgress("verificando pacote...")
-                // ZipFile valida o índice central do arquivo — detecta corrupção antes de gastar tempo extraindo.
-                val validZip = try { ZipFile(zip); true } catch (e: Exception) { ultimoErro = "arquivo baixado está corrompido"; false }
-                if (!validZip) { zip.delete(); continue }
-                onProgress("instalando pacote de voz...")
-                val dir = modelDir(ctx)
-                dir.deleteRecursively()
-                var extraiu = false
-                try {
-                    ZipFile(zip).use { zf ->
-                        val entries = zf.entries()
-                        while (entries.hasMoreElements()) {
-                            val e = entries.nextElement()
-                            val rel = e.name.removePrefix(ZIP_PREFIX)
-                            if (rel.isBlank()) continue
-                            val f = File(dir, rel)
-                            if (!f.canonicalPath.startsWith(dir.canonicalPath)) continue
-                            if (e.isDirectory) { f.mkdirs(); continue }
-                            f.parentFile?.mkdirs()
-                            zf.getInputStream(e).use { input -> f.outputStream().use { input.copyTo(it) } }
-                        }
-                    }
-                    extraiu = true
-                } catch (e: Exception) {
-                    ultimoErro = "falha ao extrair: " + (e.message ?: "erro desconhecido")
+                modelDir(ctx).deleteRecursively()
+                if (extrairZip(ctx, zip)) {
+                    zip.delete()
+                    return null
                 }
-                zip.delete()
-                if (extraiu && hasModel(ctx)) return null
-                if (ultimoErro == null) ultimoErro = "pacote instalado mas o modelo não ficou completo"
+                ultimoErro = "instalação não ficou completa"
             } catch (e: Exception) {
                 ultimoErro = (e.message ?: "erro de rede")
             }
         }
-        return "não consegui baixar o pacote de voz (" + (ultimoErro ?: "rede") + "). Tente no Wi-Fi."
+        zip.delete()
+        return "não consegui instalar o pacote de voz (" + (ultimoErro ?: "falha") + ")."
+    }
+
+    private fun extrairZip(ctx: Context, zip: File): Boolean {
+        return try {
+            ZipFile(zip).use { zf ->
+                val entries = zf.entries()
+                while (entries.hasMoreElements()) {
+                    val e = entries.nextElement()
+                    val rel = e.name.removePrefix(ZIP_PREFIX)
+                    if (rel.isBlank()) continue
+                    val f = File(modelDir(ctx), rel)
+                    if (!f.canonicalPath.startsWith(modelDir(ctx).canonicalPath)) continue
+                    if (e.isDirectory) { f.mkdirs(); continue }
+                    f.parentFile?.mkdirs()
+                    zf.getInputStream(e).use { input -> f.outputStream().use { input.copyTo(it) } }
+                }
+            }
+            hasModel(ctx)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
