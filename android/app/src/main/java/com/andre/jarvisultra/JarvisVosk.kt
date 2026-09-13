@@ -9,54 +9,94 @@ import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import java.io.File
 import java.io.FileInputStream
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
  * Voz hands-free + offline (v3.0.0): rede neural Vosk de reconhecimento de fala
  * rodando DENTRO do aparelho. O senhor fala "Jarvis" e depois o comando — sem
  * apertar botão e sem precisar de internet pra escutar. O pacote de voz (31MB)
- * baixa uma vez só, direto do release do projeto no GitHub.
+ * baixa uma vez só; se uma fonte falhar, tenta a outra.
  */
 object JarvisVosk {
-    const val MODEL_URL = "https://github.com/andre2050/Jarvis-Pro-Ultra/releases/download/v3.0.0/vosk-model-small-pt-0.3.zip"
+    private val MODEL_URLS = listOf(
+        "https://github.com/andre2050/Jarvis-Pro-Ultra/releases/download/v3.0.0/vosk-model-small-pt-0.3.zip",
+        "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"
+    )
     private const val ZIP_PREFIX = "vosk-model-small-pt-0.3/"
-    private val http = OkHttpClient()
+
+    /** Mesma blindagem do chat: DNS de reserva + timeout generoso pra 31MB. */
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .dns(FallbackDns)
+        .build()
 
     fun modelDir(ctx: Context): File = File(ctx.filesDir, "vosk-model")
 
     fun hasModel(ctx: Context): Boolean = File(modelDir(ctx), "conf").exists()
 
-    /** Baixa e instala o pacote de voz. Bloqueante — chamar fora da thread principal. */
-    fun ensureModel(ctx: Context): Boolean {
-        if (hasModel(ctx)) return true
-        return try {
-            val zip = File(ctx.cacheDir, "vosk-model.zip")
-            http.newCall(Request.Builder().url(MODEL_URL).build()).execute().use { r ->
-                if (!r.isSuccessful) return false
-                zip.outputStream().use { r.body!!.byteStream().copyTo(it) }
-            }
-            val dir = modelDir(ctx)
-            dir.deleteRecursively()
-            ZipInputStream(FileInputStream(zip)).use { zis ->
-                var e = zis.nextEntry
-                while (e != null) {
-                    val rel = e.name.removePrefix(ZIP_PREFIX)
-                    if (rel.isNotBlank()) {
-                        val f = File(dir, rel)
-                        if (f.canonicalPath.startsWith(dir.canonicalPath)) {
-                            if (e.isDirectory) f.mkdirs() else {
-                                f.parentFile?.mkdirs()
-                                f.outputStream().use { zis.copyTo(it) }
+    /**
+     * Baixa e instala o pacote de voz. Bloqueante — chamar fora da thread principal.
+     * Retorna null se ficou pronto, ou a mensagem de erro do que deu errado.
+     */
+    fun ensureModel(ctx: Context, onProgress: (String) -> Unit = {}): String? {
+        if (hasModel(ctx)) return null
+        val zip = File(ctx.cacheDir, "vosk-model.zip")
+        var ultimoErro: String? = null
+        for (url in MODEL_URLS) {
+            try {
+                onProgress("baixando pacote de voz...")
+                http.newCall(Request.Builder().url(url).build()).execute().use { r ->
+                    if (!r.isSuccessful) { ultimoErro = "servidor respondeu " + r.code; return@use }
+                    val total = r.body!!.contentLength()
+                    zip.outputStream().use { out ->
+                        val input = r.body!!.byteStream()
+                        val buf = ByteArray(16384)
+                        var done = 0L
+                        var read = input.read(buf)
+                        var lastPct = -1
+                        while (read >= 0) {
+                            out.write(buf, 0, read)
+                            done += read
+                            if (total > 0) {
+                                val pct = (done * 100 / total).toInt()
+                                if (pct / 5 != lastPct) { lastPct = pct / 5; onProgress("baixando voz... " + pct + "%") }
                             }
+                            read = input.read(buf)
                         }
                     }
-                    zis.closeEntry()
-                    e = zis.nextEntry
                 }
+                if (!zip.exists() || zip.length() < 1000000) { ultimoErro = "download incompleto"; continue }
+                onProgress("instalando pacote de voz...")
+                val dir = modelDir(ctx)
+                dir.deleteRecursively()
+                ZipInputStream(FileInputStream(zip)).use { zis ->
+                    var e = zis.nextEntry
+                    while (e != null) {
+                        val rel = e.name.removePrefix(ZIP_PREFIX)
+                        if (rel.isNotBlank()) {
+                            val f = File(dir, rel)
+                            if (f.canonicalPath.startsWith(dir.canonicalPath)) {
+                                if (e.isDirectory) f.mkdirs() else {
+                                    f.parentFile?.mkdirs()
+                                    f.outputStream().use { zis.copyTo(it) }
+                                }
+                            }
+                        }
+                        zis.closeEntry()
+                        e = zis.nextEntry
+                    }
+                }
+                zip.delete()
+                if (hasModel(ctx)) return null
+                ultimoErro = "pacote veio corrompido"
+            } catch (e: Exception) {
+                ultimoErro = (e.message ?: "erro de rede")
             }
-            zip.delete()
-            hasModel(ctx)
-        } catch (e: Exception) { false }
+        }
+        return "não consegui baixar o pacote de voz (" + (ultimoErro ?: "rede") + "). Tente no Wi-Fi."
     }
 
     /**

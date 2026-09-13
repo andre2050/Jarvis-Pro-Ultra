@@ -254,10 +254,10 @@ fun JarvisApp() {
                             } catch (e: Exception) { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
                         }
                         if (!JarvisVosk.hasModel(ctx)) {
-                            handsFree = "baixando pacote de voz (31MB)..."
+                            handsFree = "baixando pacote de voz..."
                             Thread {
-                                val ok = JarvisVosk.ensureModel(ctx)
-                                mainHandler.post { if (ok) startSession() else handsFree = "falha no download do pacote de voz" }
+                                val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { handsFree = msg } }
+                                mainHandler.post { if (err == null) startSession() else handsFree = "falha: " + err }
                             }.start()
                         } else startSession()
                     }
