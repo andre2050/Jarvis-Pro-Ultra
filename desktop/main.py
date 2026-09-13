@@ -1,19 +1,34 @@
-"""J.A.R.V.I.S — Pro Ultra Desktop (v4.3.0, Reator de Arco Vermelho)
+"""J.A.R.V.I.S — Pro Ultra Desktop v4.4.0 · Reator de Arco Vermelho × Mark LIII
+
+Fusão: interface reator de arco + persona em português (v4.3.0) com o cérebro
+do Mark LIII — rede neural de wake word local ("Hey Jarvis"), 17 ações
+auto-descritivas, undo real e confirmação com botão humano.
 
 Executa com:  python main.py
 Requer:       pip install -r requirements.txt
 """
 import queue
+import sys
 import tkinter as tk
-from tkinter import font as tkfont
+from pathlib import Path
+from tkinter import messagebox
 
-from core import brain, config, tools
+from core import brain, config, tools, confirm
+from core.action_loader import discover_actions
+from core.adapters import PlayerAdapter, SessionMemoryAdapter
+from core.config import sync_api_keys
 from ui.reactor import ArcReactorHud, RED, RED_VIVO, RED_DIM, FUNDO
 from ui.chat import ChatPanel
 from ui.settings import PainelConfig
 from voice.tts import Voz
 from voice import stt
+from voice.wakelistener import WakeListener
 from version import APP_NAME, __version__
+
+# raiz do projeto no path (as ações importam `config` e `core`)
+RAIZ = Path(__file__).resolve().parent
+if str(RAIZ) not in sys.path:
+    sys.path.insert(0, str(RAIZ))
 
 FUNDO_JANELA = "#080506"
 FUNDO_PAINEL = "#0d0708"
@@ -26,10 +41,11 @@ class JarvisApp(tk.Tk):
         super().__init__()
         self.title(f"{APP_NAME} v{__version__}")
         self.configure(bg=FUNDO_JANELA)
-        self.geometry("1080x740")
-        self.minsize(940, 640)
+        self.geometry("1120x760")
+        self.minsize(960, 660)
 
         self.cfg = config.load()
+        sync_api_keys(self.cfg)          # ações do Mark LIII leem config/api_keys.json
         self.voz = Voz(self.cfg)
         self.historico: list = []
         self.fila_eventos: queue.Queue = queue.Queue()
@@ -38,8 +54,33 @@ class JarvisApp(tk.Tk):
         # o timer das tools avisa por aqui
         tools.on_timer_fire = self._timer_disparou
 
+        # ---------- FUSÃO MARK LIII: registro de ações auto-descritivas ----------
+        self.registro = discover_actions(
+            RAIZ / "actions",
+            reserved_names=tools.nomes(),   # tools nativas têm prioridade de nome
+            logger=lambda msg: print(f"[MARK] {msg}"),
+        )
+        ctx = {
+            "player": PlayerAdapter(lambda msg: print(f"[AÇÃO] {msg}")),
+            "speak": self._falar_acao,
+            "response": None,
+            "session_memory": SessionMemoryAdapter(),
+        }
+        brain.attach_actions(self.registro, ctx)
+
+        # confirmação que o modelo não forja (shutdown, restart, wifi, arquivos)
+        confirm.bind(show=self._pedir_confirmacao, hide=lambda: None, log=print)
+
+        # wake word neural ("Hey Jarvis", local e offline)
+        self.wake = WakeListener(on_wake=self._wake_acordou, logger=print)
+
         self._montar_layout()
         self._boas_vindas()
+
+        # liga o modo mãos-livres se estava habilitado e está instalado
+        if self.cfg.get("wake_ativo") and self.wake.disponivel:
+            self.wake.iniciar()
+
         self.protocol("WM_DELETE_WINDOW", self._sair)
         self.bind("<F4>", lambda e: self._alternar_voz())
         self.after(80, self._consumir_eventos)
@@ -61,6 +102,10 @@ class JarvisApp(tk.Tk):
         self.chip.pack(side=tk.RIGHT, padx=(4, 0))
         self._chip_texto = "PRONTO"
 
+        self.btn_wake = tk.Button(topo, text="🧠 WAKE ?", command=self._alternar_wake,
+                                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                                  font=("Consolas", 9, "bold"), cursor="hand2")
+        self.btn_wake.pack(side=tk.RIGHT, padx=6)
         self.btn_voz = tk.Button(topo, text="🎙 VOZ ON", command=self._alternar_voz,
                                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
                                  font=("Consolas", 9, "bold"), cursor="hand2")
@@ -93,7 +138,7 @@ class JarvisApp(tk.Tk):
         self.chat = ChatPanel(direita)
         self.chat.pack(fill=tk.BOTH, expand=True)
 
-        # ---- barra de entrada em vidro translúcido ----
+        # ---- barra de entrada ----
         barra = tk.Frame(direita, bg="#171012")
         barra.pack(fill=tk.X, padx=10, pady=(0, 10))
         self.entrada = tk.Entry(barra, bg="#1d1214", fg=TXT_CLARO, bd=0,
@@ -102,13 +147,15 @@ class JarvisApp(tk.Tk):
         self.entrada.bind("<Return>", lambda e: self._enviar())
 
         if stt.DISPONIVEL:
-            self.btn_mic = tk.Button(barra, text="🎙", command=self._ouvir,
+            self.btn_mic = tk.Button(barra, text="🎙", command=lambda: self._ouvir(pausar_wake=True),
                                      bg="#171012", fg=RED_VIVO, bd=0,
                                      font=("Segoe UI", 13), cursor="hand2")
             self.btn_mic.pack(side=tk.LEFT, padx=(0, 6), pady=6)
         tk.Button(barra, text="ENVIAR ➤", command=self._enviar, bg="#a1160f",
                   fg="#ffe4de", bd=0, font=("Consolas", 10, "bold"),
                   cursor="hand2").pack(side=tk.LEFT, padx=(0, 10), pady=8)
+
+        self._atualiza_botao_wake()
 
     # ==================== STATUS / HUD ====================
 
@@ -141,10 +188,22 @@ class JarvisApp(tk.Tk):
         self.lbl_leituras.config(text="  ·  ".join(partes) or "sensores indisponíveis (pip install psutil)")
         self.after(2000, self._atualizar_leituras)
 
+    def _atualiza_botao_wake(self):
+        if self.wake.ligado:
+            self.btn_wake.config(text="🧠 HEY JARVIS ON", fg=RED_VIVO)
+        elif self.wake.disponivel:
+            self.btn_wake.config(text="🧠 HEY JARVIS OFF", fg=TXT_FRACO)
+        else:
+            self.btn_wake.config(text="🧠 WAKE ? (CONFIG)", fg=TXT_FRACO)
+
     # ==================== CHAT ====================
 
     def _boas_vindas(self):
-        self.chat.add("jarvis", "Sistemas online, senhor. Reator de arco operando a plena capacidade.")
+        n_acoes = len(self.registro.names())
+        self.chat.add("jarvis",
+                      "Sistemas online, senhor. Reator de arco operando a plena capacidade.")
+        if n_acoes:
+            self.chat.add("sistema", f"{n_acoes} ações do Mark LIII fundidas ao meu arsenal.")
         if not config.api_key_ok(self.cfg):
             self.chat.add("sistema", "Cole sua chave do Gemini em ⚙ CONFIG para me dar um cérebro — "
                                      "é grátis em aistudio.google.com")
@@ -167,16 +226,60 @@ class JarvisApp(tk.Tk):
 
         brain.process_async(self.cfg["gemini_api_key"], self.historico, msg, retorno)
 
-    def _ouvir(self):
+    def _ouvir(self, pausar_wake: bool = False):
         if self._ocupado:
             return
         self._status("ouvindo", ouvindo=True)
+        if pausar_wake and self.wake.ligado:
+            self.wake.pausar()   # solta o microfone pro STT
 
         def run():
             texto = stt.ouvir()
+            if pausar_wake and self.wake.ligado:
+                self.after(200, self.wake.retomar)  # devolve o microfone ao detector
             self.fila_eventos.put(("voz", texto))
         import threading
         threading.Thread(target=run, daemon=True).start()
+
+    # ---- wake word neural ----
+
+    def _wake_acordou(self):
+        """A rede neural local ouviu 'Hey Jarvis' — acorda o modo mãos-livres."""
+        if self._ocupado:
+            return
+        self.chat.add("sistema", "🧠 'Hey Jarvis' detectado — estou ouvindo, senhor.")
+        self._ouvir(pausar_wake=True)
+
+    def _alternar_wake(self):
+        if self.wake.ligado:
+            self.wake.parar()
+            self.cfg["wake_ativo"] = False
+            config.save(self.cfg)
+            self.chat.add("sistema", "Wake word desligado.")
+        elif self.wake.disponivel:
+            if self.wake.iniciar():
+                self.cfg["wake_ativo"] = True
+                config.save(self.cfg)
+                self.chat.add("sistema", "Modo mãos-livres ligado: fale 'Hey Jarvis' e eu escuto (detecção 100% local).")
+            else:
+                self.chat.add("sistema", "não consegui abrir o microfone pra o wake word.")
+        else:
+            self.chat.add("sistema", "Wake word não instalado — instale em ⚙ CONFIG → WAKE WORD (um clique).")
+            self._abrir_config()
+        self._atualiza_botao_wake()
+
+    # ---- fala intermediária das ações (instant acknowledgment) ----
+
+    def _falar_acao(self, msg: str):
+        """speak() das ações — atravessa a fila pra chegar à UI com segurança."""
+        if msg:
+            self.fila_eventos.put(("fala", str(msg)))
+
+    # ---- confirmação com botão humano (core/confirm.py) ----
+
+    def _pedir_confirmacao(self, titulo: str, detalhe: str):
+        """show do confirm.bind — chamado da thread do cérebro; só empurra pra fila."""
+        self.fila_eventos.put(("confirm", (titulo, detalhe)))
 
     # ==================== EVENTOS DA FILA ====================
 
@@ -190,13 +293,24 @@ class JarvisApp(tk.Tk):
                            else "⏰ Timer finalizado, senhor.")
                     self.chat.add("jarvis", msg)
                     self.voz.falar(msg)
+                elif isinstance(item, tuple) and item[0] == "fala":
+                    _, frase = item
+                    self.chat.add("sistema", f"« {frase} »")
+                    self.voz.falar(frase)
+                elif isinstance(item, tuple) and item[0] == "confirm":
+                    titulo, detalhe = item[1]
+                    aceito = messagebox.askyesno(
+                        "J.A.R.V.I.S — confirmação necessária",
+                        f"{titulo}\n\n{detalhe}\n\nConfirmar?",
+                        icon="warning", parent=self)
+                    confirm.resolve(aceito)   # só o humano desbloqueia
                 elif isinstance(item, tuple) and item[0] == "voz":
                     _, texto = item
                     self._status("pronto")
                     if texto:
                         self.chat.add("sistema", f"🎙 ouvi: \"{texto}\"")
                         self._enviar(texto)
-                    else:
+                    elif not self.wake.ligado:
                         self.chat.add("sistema", "não captei nada, senhor.")
                 elif isinstance(item, Exception):
                     self._finalizar_turno(str(item), erro=True)
@@ -235,12 +349,20 @@ class JarvisApp(tk.Tk):
 
     def recarregar_config(self):
         self.cfg = config.load()
+        sync_api_keys(self.cfg)
         self.voz.config = self.cfg
         self.voz.enabled = bool(self.cfg.get("voz_ativa", True))
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if self.voz.enabled else 'OFF'}",
                             fg=RED_VIVO if self.voz.enabled else TXT_FRACO)
+        self._atualiza_botao_wake()
 
     def _sair(self):
+        try:
+            self.wake.parar()
+            from core.undo import clear as undo_clear
+            undo_clear()
+        except Exception:
+            pass
         config.save(self.cfg)
         self.destroy()
 

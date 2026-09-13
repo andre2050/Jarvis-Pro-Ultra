@@ -1,18 +1,38 @@
-# J.A.R.V.I.S — Pro Ultra Desktop v4.3.0
-# Essenciais
+# ── Essenciais ────────────────────────────────────────────────────────────────
 requests
 psutil
+numpy
+sounddevice          # stream de microfone do wake word
 
-# Voz (TTS offline) — opcional, o JARVIS degrada com elegância se faltar
+# ── Voz ── (opcionais, o JARVIS degrada com elegância se faltarem) ─────────────
 pyttsx3
-
-# Reconhecimento de fala — opcional (no Windows precisa do pyaudio)
 SpeechRecognition
 pyaudio
 
-# Busca na web sem abrir navegador — opcional
-duckduckgo-search
+# ── Wake word neural ("Hey Jarvis", local e offline) ── instale via ⚙ CONFIG ───
+# openwakeword      # ou: pip install openwakeword
 
-# Controle fino de volume no Windows — opcional
-pycaw; platform_system == "Windows"
-comtypes; platform_system == "Windows"
+# ── Busca e navegador ─────────────────────────────────────────────────────────
+duckduckgo-search
+beautifulsoup4
+playwright           # browser_control (ação do Mark LIII); depois: playwright install chromium
+
+# ── Ações Mark LIII: arquivos, visão, automação ───────────────────────────────
+google-genai         # file_processor / code_helper / dev_agent (chave em config/api_keys.json)
+pyautogui
+pyperclip
+pygetwindow
+pillow
+opencv-python
+mss
+send2trash
+youtube-transcript-api
+python-pptx
+openpyxl
+
+# ── Windows ── (pip pula sozinho no mac/linux) ─────────────────────────────────
+comtypes;   sys_platform == "win32"
+pycaw;      sys_platform == "win32"
+pywin32;    sys_platform == "win32"
+pywinauto;  sys_platform == "win32"
+wmi;        sys_platform == "win32"

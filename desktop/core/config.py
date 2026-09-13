@@ -34,3 +34,25 @@ def save(cfg: dict) -> None:
 
 def api_key_ok(cfg: dict) -> bool:
     return bool(cfg.get("gemini_api_key", "").strip())
+
+
+def sync_api_keys(cfg: dict) -> None:
+    """Mantém config/api_keys.json (formato lido pelas ações do Mark LIII) em dia."""
+    try:
+        from pathlib import Path
+        raiz = Path(__file__).resolve().parent.parent  # raiz do projeto
+        arquivo = raiz / "config" / "api_keys.json"
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        dados = {}
+        if arquivo.exists():
+            try:
+                dados = json.loads(arquivo.read_text(encoding="utf-8"))
+            except Exception:
+                dados = {}
+        if not isinstance(dados, dict):
+            dados = {}
+        if cfg.get("gemini_api_key"):
+            dados["gemini_api_key"] = cfg["gemini_api_key"].strip()
+        arquivo.write_text(json.dumps(dados, indent=2), encoding="utf-8")
+    except Exception:
+        pass

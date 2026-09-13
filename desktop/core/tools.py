@@ -57,10 +57,19 @@ def declarations() -> list:
         _decl("listar_memorias", "Lista as memórias de longo prazo guardadas."),
         _decl("definir_timer", "Define um timer/lembrete que avisa com mensagem e voz quando o tempo acaba.",
               {"type": "object", "properties": {"segundos": {"type": "number", "description": "Duração em segundos"}, "motivo": {"type": "string", "description": "Motivo do timer (opcional)"}}, "required": ["segundos"]}),
+        _decl("desfazer_ultima_acao", "Desfaz a ação reversível mais recente (arquivos movidos/renomeados/criados/editados, configurações alteradas)."),
     ]
 
 
 # ==================== EXECUÇÃO ====================
+
+def nomes() -> set:
+    """Nomes das tools nativas (usado pra reservar nomes no registro de ações)."""
+    return {"hora_agora", "status_do_sistema", "clima", "onde_estou", "navegar_para",
+            "tocar_musica", "controlar_volume", "pesquisar_web", "abrir_site",
+            "abrir_app", "lembrar_fato", "listar_memorias", "definir_timer",
+            "desfazer_ultima_acao"}
+
 
 def execute(name: str, args: dict) -> str:
     fn = {
@@ -77,6 +86,7 @@ def execute(name: str, args: dict) -> str:
         "lembrar_fato": lambda: memory.lembrar(args.get("fato", "")),
         "listar_memorias": lambda: memory.listar(),
         "definir_timer": lambda: _timer(args.get("segundos", 60), args.get("motivo", "")),
+        "desfazer_ultima_acao": _desfazer,
     }.get(name)
     if fn is None:
         return f"tool desconhecida: {name}"
@@ -317,6 +327,11 @@ def _app(app: str) -> str:
         return f"abrindo {app}, senhor."
     except Exception as e:
         return f"não consegui abrir '{app}': {e}"
+
+
+def _desfazer() -> str:
+    from .undo import undo_last
+    return undo_last()
 
 
 def _timer(segundos, motivo: str) -> str:

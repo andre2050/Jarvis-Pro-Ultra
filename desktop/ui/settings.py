@@ -3,7 +3,8 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from core import config, gemini_client, updater
+from core import config, gemini_client, updater, wake_word
+from core.config import sync_api_keys
 from version import __version__, GITHUB_REPO
 
 
@@ -78,6 +79,24 @@ class PainelConfig(tk.Toplevel):
         tk.Button(zona, text="Testar voz", command=self._testar_voz, bg="#a1160f",
                   fg="#ffe4de", bd=0, font=("Segoe UI", 9, "bold"), cursor="hand2",
                   padx=12, pady=4).pack(padx=10, pady=(2, 10), anchor="w")
+
+        # ---------- WAKE WORD (rede neural local) ----------
+        self._secao("🧠 WAKE WORD — 'HEY JARVIS'")
+        zona_w = tk.Frame(self, bg="#171012")
+        zona_w.pack(fill=tk.X, padx=24)
+        self.lbl_wake = tk.Label(zona_w, text="", fg="#9c8a86", bg="#171012",
+                                 font=("Segoe UI", 9), anchor="w", justify=tk.LEFT)
+        self.lbl_wake.pack(fill=tk.X, padx=10, pady=(8, 2))
+        linha_w = tk.Frame(zona_w, bg="#171012")
+        linha_w.pack(fill=tk.X, padx=10, pady=(2, 10))
+        tk.Button(linha_w, text="Instalar agora (1 clique)",
+                  command=self._instalar_wake, bg="#a1160f", fg="#ffe4de", bd=0,
+                  font=("Segoe UI", 9, "bold"), cursor="hand2",
+                  padx=12, pady=4).pack(side=tk.LEFT)
+        self.lbl_wake_instala = tk.Label(linha_w, text="", fg="#9c8a86", bg="#171012",
+                                         font=("Segoe UI", 9))
+        self.lbl_wake_instala.pack(side=tk.LEFT, padx=10)
+        self._atualiza_status_wake()
 
         # ---------- ATUALIZAÇÃO ----------
         self._secao("⟳ ATUALIZAÇÃO")
@@ -154,6 +173,34 @@ class PainelConfig(tk.Toplevel):
     def _testar_voz(self):
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
 
+    # ==================== WAKE WORD ====================
+
+    def _atualiza_status_wake(self):
+        try:
+            from voice.wakelistener import WakeListener, TEM_SOUNDDEVICE
+            dummy = WakeListener(lambda: None)
+            if dummy.disponivel:
+                texto = "✓ Rede neural pronta — fale 'Hey Jarvis' com o app aberto (100% local e offline)"
+            elif wake_word.is_installed() and not TEM_SOUNDDEVICE:
+                texto = "✓ openwakeword instalado, falta 'sounddevice' (pip install sounddevice)"
+            else:
+                texto = "Não instalado — a detecção ouve 'Hey Jarvis' localmente; nada sai do seu microfone"
+            self.lbl_wake.config(text=texto)
+        except Exception as e:
+            self.lbl_wake.config(text=f"status indisponível: {e}")
+
+    def _instalar_wake(self):
+        self.lbl_wake_instala.config(text="instalando (baixa um modelo de ~5 MB, única vez)…")
+        def run():
+            ok, msg = wake_word.install_and_download(
+                logger=lambda m: self.after(0, lambda mm=m: self.lbl_wake_instala.config(text=mm[:70]))
+            )
+            self.after(0, lambda: self.lbl_wake_instala.config(
+                text=("✓ instalado!" if ok else f"✗ {msg[:60]}"),
+                fg=("#7dc98f" if ok else "#ff9a8f")))
+            self.after(0, self._atualiza_status_wake)
+        threading.Thread(target=run, daemon=True).start()
+
     def _checar_update(self):
         self.lbl_versao.config(text="consultando o GitHub…")
         def run():
@@ -171,5 +218,6 @@ class PainelConfig(tk.Toplevel):
         cfg["voz_ativa"] = self.var_voz.get()
         cfg["voz_velocidade"] = float(self.vel.get())
         config.save(cfg)
+        sync_api_keys(cfg)
         self.app.recarregar_config()
         self.destroy()

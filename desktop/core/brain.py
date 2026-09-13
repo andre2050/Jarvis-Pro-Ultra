@@ -7,10 +7,40 @@ import threading
 import time
 
 from . import gemini_client, memory, perception, tools
+from .adapters import normaliza_schema
 from version import __version__
 
-MAX_TOOL_ROUNDS = 4
+MAX_TOOL_ROUNDS = 6  # v4.4.0: toolkit maior (ações do Mark LIII) pede mais rodadas
 RETRY_503 = 2  # retentativas enxutas (v4.0.1)
+
+# Registro das ações auto-descritivas (Mark LIII) — anexado pelo main.py
+_registro = None
+_ctx = None
+
+
+def attach_actions(registro, ctx: dict) -> None:
+    """Funde as ações descobertas (actions/*.py com TOOL) ao cérebro."""
+    global _registro, _ctx
+    _registro = registro
+    _ctx = ctx
+
+
+def todas_declaracoes() -> list:
+    """Tools nativas + ações do Mark LIII, com schema normalizado."""
+    decls = list(tools.declarations())
+    if _registro is not None:
+        for d in _registro.get_tool_declarations():
+            decls.append(normaliza_schema(d))
+    return decls
+
+
+def _executa_tool(name: str, args: dict) -> str:
+    """Despacha: primeiro as tools nativas, depois o registro de ações."""
+    if name in tools.nomes():
+        return tools.execute(name, args)
+    if _registro is not None and _registro.has(name):
+        return _registro.run(name, args, _ctx or {})
+    return f"tool desconhecida: {name}"
 
 
 def system_prompt() -> str:
@@ -24,6 +54,7 @@ Regras:
 - Você controla o computador do senhor: abrir apps (abrir_app), sites (abrir_site), música no YouTube (tocar_musica), volume (controlar_volume) e timers (definir_timer). Prefira sempre as tools quando ele pedir ações do computador.
 - PERCEPÇÃO TOTAL (v4.0): clima (tempo real via Open-Meteo), onde_estou (cidade via IP), navegar_para (abre o mapa com a rota) e pesquisar_web.
 - Você tem memória de longo prazo: quando o usuário pedir para lembrar ou guardar algo, chame a tool lembrar_fato. Para listar, listar_memorias.
+- Ações do Mark LIII também estão disponíveis (open_app, web_search, browser_control, file_processor, file_controller, code_helper, dev_agent, computer_control, computer_settings, desktop, send_message, youtube_video, reminder, flight_finder, game_updater, weather_report) — use-as quando pedirem arquivos, navegador, código, mensagens ou controle fino do computador. Prefira desfazer_ultima_acao quando o senhor pedir para desfazer algo que você fez.
 - No fim deste prompt vem o CONTEXTO VIVO do computador (hora, CPU, RAM, bateria) — você já sabe isso sem precisar de tools; cite quando for útil (ex: 'CPU em 87%, senhor, sugiro fechar umas abas').
 - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo e listar_memorias — um resumo curto e espirituoso.
 - Se não tiver a tool certa, responda o melhor que puder e sugira o que pode fazer.
@@ -54,7 +85,7 @@ def process(api_key: str, history: list, user_message: str) -> TurnResult:
     tools_used = []
 
     for _round in range(1, MAX_TOOL_ROUNDS + 1):
-        result = gemini_client.turn(api_key, prompt, history, tools.declarations())
+        result = gemini_client.turn(api_key, prompt, history, todas_declaracoes())
 
         if not result.function_call_parts:
             if result.text:
@@ -74,7 +105,7 @@ def process(api_key: str, history: list, user_message: str) -> TurnResult:
             name = call.get("name", "")
             args = call.get("args") or {}
             try:
-                output = tools.execute(name, args)
+                output = _executa_tool(name, args)
             except Exception as e:
                 output = f"erro ao executar '{name}': {e}"
             memory.log_interaction(name, str(output)[:80])

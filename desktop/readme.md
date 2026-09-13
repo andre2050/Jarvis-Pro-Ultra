@@ -1,24 +1,33 @@
-# 🤖 J.A.R.V.I.S — Pro Ultra Desktop v4.3.0 — Reator de Arco Vermelho
+# 🤖 J.A.R.V.I.S — Pro Ultra Desktop v4.4.0
+## Reator de Arco Vermelho × Mark LIII
 
-O JARVIS da v4.3.0 do Android, agora no seu computador — 100% Python.
+A fusão: a interface **Reator de Arco Vermelho** da v4.3.0 com o arsenal do
+[Mark LIII](https://github.com/FatihMakes) — **rede neural de wake word local**,
+16 ações auto-descritivas, undo real e confirmação que o modelo não forja.
 
-Interface: o **reator de arco do Homem de Ferro** — dial circular vermelho
-com marcações de instrumento, blooms de luz pulsantes, anel de chevrons
-girando (acelera no modo mãos-livres), grade radial e o núcleo com a
-leitura viva do computador (bateria no laptop ou CPU no desktop, hora e
-data, ao vivo).
+> ⚠️ **Update da v4.3.0**: se já usava a v4.3.0, só rodar por cima — suas
+> memórias e configurações (`~/.jarvis_pro_ultra`) continuam valendo.
 
-## ✨ O que ele faz
+## ✨ O que entrou de novo (v4.4.0)
 
 | Módulo | Descrição |
 |---|---|
-| 🧠 Cérebro Gemini | Function calling real, com lista de modelos estáveis e Modo Turbo (v4.0.1) |
-| 🎙️ Voz | Fala em voz alta (TTS offline) e escuta comandos (STT, opcional). **F4** liga/desliga a voz |
-| 👁️ Percepção Total | Clima em tempo real (Open-Meteo), onde você está (IP), rota no mapa |
-| 🖥️ Status do sistema | CPU, RAM, bateria e disco — injetados no cérebro a cada turno |
-| 📦 Tools | Música no YouTube, volume, abrir apps/sites, busca web, timer, memória de longo prazo |
-| ⚙️ Configurações | Chave do Gemini (com teste), voz, verificação de atualização no GitHub, sobre |
-| 💾 Memória | Guarda fatos a seu pedido em `~/.jarvis_pro_ultra/memory.json` |
+| 🧠 **Wake Word "Hey Jarvis"** | Rede neural local (openwakeword/ONNX, ~5 MB, offline). Fale "Hey Jarvis" e ele escuta o comando — nada sai do seu microfone antes do disparo. Instala em 1 clique em ⚙ CONFIG |
+| 🧩 **Ações auto-descritivas** | Sistema do Mark LIII: cada `actions/*.py` se descreve e é descoberto no boot — adicionar skill é largar um arquivo |
+| 📂 **File Processor / Controller** | Ler, resumir e responder perguntas sobre arquivos; mover/renomear com proteção |
+| 💻 **Code Helper & Dev Agent** | Revisão inline de código e agente de desenvolvimento |
+| 🌐 **Browser Control** | Controle de navegador por voz (Playwright) |
+| 📨 **Send Message** | WhatsApp, Telegram e afins via webhook/URL |
+| 🖥️ **System & Desktop Control** | Monitor de hardware, janelas, atalhos, configurações, energia |
+| ↩️ **Undo real** | Desfaz arquivos movidos/criados/renomeados e configurações ("desfaz a última ação") |
+| ⚠️ **Confirmação com botão humano** | Desligar, reiniciar e ações irreversíveis esperam VOCÊ apertar — o modelo não pode forjar |
+| ⏰ **Reminders nativos** | Lembretes via sistema (Task Scheduler / LaunchAgent / systemd) |
+| ✈️🎮 **Flight Finder & Game Updater** | Passagens ao vivo e updates de Steam/Epic |
+| 🎬 **YouTube avançado** | Busca, transcrição e controle de reprodução |
+
+E tudo da v4.3.0 continua: reator animado, cérebro Gemini com function calling
++ Modo Turbo, 14 tools nativas (clima real via Open-Meteo, onde estou, música,
+volume, timer, memória de longo prazo…), voz pt-BR e painel de configurações.
 
 ## ⚡ Quick Start
 
@@ -27,46 +36,32 @@ pip install -r requirements.txt
 python main.py
 ```
 
-> Se der `ModuleNotFoundError` em algum opcional (pyaudio, pycaw…),
-> instale só o que faltar — nada quebra sem eles.
-
-Depois:
-1. Clique em **⚙ CONFIG** (canto superior direito)
-2. Cole sua **chave do Gemini** — grátis em https://aistudio.google.com
-3. Clique em **Salvar e Testar** — o mordomo acorda
-
-## 🎙️ Mão na massa
-
-- Digite ou fale: *"qual o tempo agora?"*, *"toca Iron Maiden"*,
-  *"onde estou?"*, *"me leva até o mercado"*, *"lembra que o aniversário
-  da Ana é dia 20"*, *"status do sistema"*, *"timer de 5 minutos pro macarrão"*
-- **F4** — liga/desliga a voz (privacidade em um toque)
-- Teste de voz nas configurações: *"Good evening. All systems are online
-  and operating at full capacity."*
+1. **⚙ CONFIG** → cole sua chave do Gemini (grátis em https://aistudio.google.com) → **Salvar e Testar**
+2. (opcional) **⚙ CONFIG → WAKE WORD → Instalar agora** → depois **🧠 HEY JARVIS** na barra superior
+3. Fale ou digite. Exemplos: *"resuma o arquivo contrato.pdf"*, *"Hey Jarvis, qual o clima em Recife?"*,
+   *"abre o Chrome"*, *"pesquisa preços de RTX 5090"*, *"desfaz a última ação"*
 
 ## 📁 Estrutura
 
 ```
-main.py              — janela principal (reator + chat + entrada)
+main.py                  — janela, registro de ações, wake word, confirmação
 core/
-  brain.py           — persona + loop de function calling
-  gemini_client.py   — Gemini com fallback de modelos e retry enxuto
-  tools.py           — 13 tools de desktop (clima, música, volume, memória…)
-  perception.py      — contexto vivo do computador
-  memory.py          — memória de longo prazo
-  config.py          — ~/.jarvis_pro_ultra/config.json
-  updater.py         — consulta releases no GitHub
-voice/
-  tts.py             — voz offline (fila dedicada)
-  stt.py             — reconhecimento de fala (opcional)
-ui/
-  reactor.py         — o reator de arco animado (porte do ArcReactorHud.kt)
-  chat.py            — bolhas estilo v4.1.0 'Elegância'
-  settings.py        — painel de configurações (v4.2.0)
+  brain.py               — persona + loop de function calling (nativas + Mark LIII)
+  action_loader.py       — descoberta automática de ações (do Mark LIII)
+  adapters.py            — liga as ações ao nosso app (log, voz, sessão)
+  wake_word.py           — rede neural local "Hey Jarvis" (do Mark LIII)
+  confirm.py / undo.py   — confirmação humana + pilha de desfazer (do Mark LIII)
+  gemini_client.py / tools.py / perception.py / memory.py — núcleo v4.3.0
+actions/                 — 16 ações auto-descritivas (do Mark LIII)
+voice/                   — TTS, STT e escuta neural contínua
+ui/                      — reator de arco, chat e configurações
+config/                  — helpers de SO + api_keys.json (formato Mark LIII)
 ```
 
-## ⚠️ Licença
-Uso pessoal e não comercial — CC BY-NC 4.0, mesma do projeto original.
+## 📄 Licenças
+
+- Projeto original: CC BY-NC 4.0 (uso pessoal e não comercial)
+- Módulos do Mark LIII (FatihMakes): CC BY-NC 4.0 — ver `LICENSE-MARK-LIII`
 
 ---
-**André Luiz Lima Menezes** — baseado no [Jarvis-Pro-Ultra](https://github.com/andre2050/Jarvis-Pro-Ultra) v4.3.0
+**André Luiz Lima Menezes** — [Jarvis-Pro-Ultra](https://github.com/andre2050/Jarvis-Pro-Ultra)
