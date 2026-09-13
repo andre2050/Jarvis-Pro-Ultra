@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "4.1.0"
+        versionCode = 20
+        versionName = "4.2.0"
     }
 
     signingConfigs {

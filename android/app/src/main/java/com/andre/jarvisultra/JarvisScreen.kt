@@ -36,6 +36,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -74,6 +76,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.io.File
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -95,6 +98,7 @@ fun JarvisApp() {
     var showSettings by remember { mutableStateOf(!apiKeySaved) }
     var updateInfo by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    var voiceWork by remember { mutableStateOf<String?>(null) }
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
     var handsFree by remember { mutableStateOf("off") }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
@@ -385,9 +389,11 @@ fun JarvisApp() {
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { if (apiKeySaved) showSettings = false },
-            title = { Text("Configuração do JARVIS (v" + JarvisBrain.APP_VERSION + ")") },
+            title = { Text("Configurações — v" + JarvisBrain.APP_VERSION) },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("CHAVE DO GEMINI", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
                     Text("Cole sua chave do Google AI Studio (fica só neste dispositivo):", fontSize = 13.sp)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -416,10 +422,67 @@ fun JarvisApp() {
                                 "\u2705 Chave OK! O Gemini (" + r.model + ") respondeu."
                             } catch (e: Exception) { "\u274c " + (e.message ?: "falhou") }
                         }
-                    }) { Text("Testar chave") }
+                    }) { Text("Testar chave", fontSize = 12.sp) }
                     testResult?.let { tr ->
                         Text(tr, fontSize = 12.sp, color = Cyan)
                     }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("MICROFONE \ud83c\udf99\ufe0f", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    val vozPronta = JarvisVosk.hasModel(ctx)
+                    val vozMb = try { File(ctx.filesDir, "vosk-model").walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1048576 } catch (e: Exception) { 0L }
+                    Text(
+                        if (vozPronta) "Pacote de voz pt-BR instalado (" + vozMb + "MB) — reconhecimento offline pronto. O modo mãos-livres responde ao nome 'Jarvis'."
+                        else "Pacote de voz ainda não instalado — ele se instala sozinho ao ligar o modo mãos-livres (ícone de telefone no rodapé).",
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row {
+                        TextButton(onClick = {
+                            voiceWork = "reinstalando…"
+                            Thread {
+                                try { File(ctx.filesDir, "vosk-model").deleteRecursively() } catch (_: Exception) { }
+                                val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { voiceWork = msg } }
+                                mainHandler.post {
+                                    voiceWork = if (err == null) "\u2705 pacote reinstalado" else "\u274c " + err
+                                }
+                            }.start()
+                        }) { Text(if (voiceWork == null) "Reinstalar pacote" else voiceWork!!, fontSize = 12.sp) }
+                        TextButton(onClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Teste de microfone — fale qualquer coisa")
+                            }
+                            stt.launch(intent)
+                        }) { Text("Testar microfone", fontSize = 12.sp) }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("ATUALIZAÇÃO", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Verifico novas versões direto no GitHub — instala por cima sem perder nada.", fontSize = 12.sp)
+                    Row {
+                        TextButton(onClick = {
+                            scope.launch {
+                                updateInfo = try { Updater.check() } catch (e: Exception) { e.message }
+                            }
+                        }) { Text("Verificar agora", fontSize = 12.sp) }
+                        TextButton(onClick = {
+                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Updater.RELEASES_URL)))
+                        }) { Text("Página de releases", fontSize = 12.sp) }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("SOBRE", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "J.A.R.V.I.S PRO ULTRA — assistente pessoal com IA.\n\n" +
+                        "Kotlin + Jetpack Compose • Cérebro: Google Gemini • Voz offline: Vosk pt-BR\n\n" +
+                        "Desenvolvedor: André Lima\nCódigo aberto: github.com/andre2050/Jarvis-Pro-Ultra",
+                        fontSize = 12.sp
+                    )
                 }
             },
             confirmButton = {
