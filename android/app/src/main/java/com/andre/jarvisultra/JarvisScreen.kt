@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -42,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +65,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -152,7 +165,16 @@ fun JarvisApp() {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFF0A1222), Color(0xFF070B14), Color(0xFF04070D)))
+        )
+    ) {
+        Box(
+            Modifier.fillMaxWidth().height(320.dp).background(
+                Brush.radialGradient(listOf(Cyan.copy(alpha = 0.07f), Color(0x00000000)))
+            )
+        )
         HudBackground(Modifier.fillMaxSize(), isThinking = isThinking, isListening = (handsFree == "on"))
         Column(
             modifier = Modifier
@@ -185,18 +207,32 @@ fun JarvisApp() {
                 }
             }
         }
-        Text(
-            text = when {
-                isThinking -> "processando…"
-                isSpeaking -> "falando…"
-                handsFree == "on" -> "escutando — fale \"jarvis\""
-                else -> "J.A.R.V.I.S PRO ULTRA v" + JarvisBrain.APP_VERSION + " — online"
-            },
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp),
-            color = Cyan.copy(alpha = 0.75f),
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace
-        )
+        Row(
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val dotPulse by rememberInfiniteTransition(label = "dot")
+                .animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "dp")
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .graphicsLayer { alpha = 0.35f + 0.65f * dotPulse }
+                    .background(Cyan, CircleShape)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = when {
+                    isThinking -> "processando…"
+                    isSpeaking -> "falando…"
+                    handsFree == "on" -> "escutando — fale \"jarvis\""
+                    else -> "J.A.R.V.I.S PRO ULTRA v" + JarvisBrain.APP_VERSION + " — online"
+                },
+                color = Cyan.copy(alpha = 0.75f),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.5.sp
+            )
+        }
 
         LazyColumn(
             state = listState,
@@ -205,8 +241,15 @@ fun JarvisApp() {
         ) {
             items(messages) { m ->
                 val isUser = m.role == "user"
+                var shown by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { shown = true }
+                val animAlpha by animateFloatAsState(if (shown) 1f else 0f, tween(280), label = "a")
+                val animDy by animateFloatAsState(if (shown) 0f else 22f, tween(280), label = "dy")
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().graphicsLayer {
+                        alpha = animAlpha
+                        translationY = animDy
+                    },
                     horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
                 ) {
                     Text(
@@ -216,28 +259,48 @@ fun JarvisApp() {
                         color = if (isUser) CyanDim else Cyan.copy(alpha = 0.75f),
                         modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 2.dp)
                     )
+                    val shape = RoundedCornerShape(
+                        topStart = if (isUser) 14.dp else 4.dp,
+                        topEnd = if (isUser) 4.dp else 14.dp,
+                        bottomStart = 14.dp,
+                        bottomEnd = 14.dp
+                    )
                     Surface(
-                        color = if (isUser) Cyan.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface,
+                        color = if (isUser) Cyan.copy(alpha = 0.12f) else Color(0xF20D1526),
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        shape = RoundedCornerShape(
-                            topStart = if (isUser) 12.dp else 3.dp,
-                            topEnd = if (isUser) 3.dp else 12.dp,
-                            bottomStart = 12.dp,
-                            bottomEnd = 12.dp
-                        ),
-                        border = BorderStroke(1.dp, if (isUser) CyanDim else HoloLine),
-                        modifier = Modifier.widthIn(max = 320.dp)
+                        shape = shape,
+                        modifier = Modifier
+                            .widthIn(max = 320.dp)
+                            .border(
+                                width = 1.dp,
+                                brush = if (isUser)
+                                    Brush.linearGradient(listOf(CyanDim, Cyan.copy(alpha = 0.15f)))
+                                else
+                                    Brush.linearGradient(listOf(Cyan.copy(alpha = 0.20f), HoloLine)),
+                                shape = shape
+                            )
                     ) {
-                        Text(m.text, Modifier.padding(10.dp), fontSize = 14.sp, lineHeight = 19.sp)
+                        Text(
+                            m.text,
+                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            fontSize = 14.sp,
+                            lineHeight = 19.sp
+                        )
                     }
                 }
             }
         }
 
         Surface(
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+            color = Color(0xD90A1222),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+                .border(
+                    1.dp,
+                    Brush.horizontalGradient(listOf(HoloLine, Cyan.copy(alpha = 0.20f), HoloLine)),
+                    RectangleShape
+                )
         ) {
             if (handsFree != "off" && handsFree != "on") {
                 Text(handsFree, Modifier.padding(start = 12.dp, top = 4.dp), fontSize = 11.sp, color = CyanDim)
@@ -298,9 +361,16 @@ fun JarvisApp() {
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp) },
+                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp, color = Color(0xFF5A6B85)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Cyan,
+                        unfocusedBorderColor = HoloLine,
+                        focusedTextColor = Color(0xFFE2EEF9),
+                        unfocusedTextColor = Color(0xFFE2EEF9),
+                        cursorColor = Cyan
+                    )
                 )
 
                 Spacer(Modifier.width(6.dp))
