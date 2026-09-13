@@ -171,7 +171,7 @@ fun JarvisApp() {
 
     Box(
         Modifier.fillMaxSize().background(
-            Brush.verticalGradient(listOf(Color(0xFF0A1222), Color(0xFF070B14), Color(0xFF04070D)))
+            Brush.verticalGradient(listOf(Color(0xFF150404), Color(0xFF0A0303), Color(0xFF020000)))
         )
     ) {
         Box(
@@ -187,10 +187,11 @@ fun JarvisApp() {
                 .navigationBarsPadding()
         ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            HologramFace(
+            ArcReactorHud(
                 modifier = Modifier
                     .padding(top = 8.dp, bottom = 4.dp)
-                    .size(150.dp),
+                    .size(190.dp),
+                ctx = ctx,
                 isSpeaking = isSpeaking,
                 isThinking = isThinking,
                 isListening = (handsFree == "on")
@@ -270,7 +271,7 @@ fun JarvisApp() {
                         bottomEnd = 14.dp
                     )
                     Surface(
-                        color = if (isUser) Cyan.copy(alpha = 0.12f) else Color(0xF20D1526),
+                        color = if (isUser) Cyan.copy(alpha = 0.12f) else Color(0xF2190606),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         shape = shape,
                         modifier = Modifier
@@ -296,7 +297,7 @@ fun JarvisApp() {
         }
 
         Surface(
-            color = Color(0xD90A1222),
+            color = Color(0xD9130404),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 6.dp)
@@ -365,14 +366,14 @@ fun JarvisApp() {
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp, color = Color(0xFF5A6B85)) },
+                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp, color = Color(0xFF8A6060)) },
                     singleLine = true,
                     shape = RoundedCornerShape(18.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Cyan,
                         unfocusedBorderColor = HoloLine,
-                        focusedTextColor = Color(0xFFE2EEF9),
-                        unfocusedTextColor = Color(0xFFE2EEF9),
+                        focusedTextColor = Color(0xFFF3E5E0),
+                        unfocusedTextColor = Color(0xFFF3E5E0),
                         cursorColor = Cyan
                     )
                 )

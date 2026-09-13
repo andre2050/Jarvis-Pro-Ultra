@@ -20,11 +20,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-val Cyan = Color(0xFF22D3EE)
-val CyanDim = Color(0xFF0E7490)
-val HoloBg = Color(0xFF070B14)
-val HoloCard = Color(0xFF0D1526)
-val HoloLine = Color(0xFF1B2B4A)
+// Paleta v4.3.0: reator de arco vermelho (os nomes "Cyan…" ficaram de herança do HUD ciano original)
+val Cyan = Color(0xFFFF2A2A)
+val CyanDim = Color(0xFF8A0F12)
+val HoloBg = Color(0xFF0A0303)
+val HoloCard = Color(0xFF170707)
+val HoloLine = Color(0xFF3A1414)
 
 @Composable
 fun JarvisTheme(content: @Composable () -> Unit) {
