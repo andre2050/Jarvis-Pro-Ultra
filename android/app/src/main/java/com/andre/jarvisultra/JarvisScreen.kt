@@ -151,20 +151,22 @@ fun JarvisApp() {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-    ) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        HudBackground(Modifier.fillMaxSize(), isThinking = isThinking, isListening = (handsFree == "on"))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             HologramFace(
                 modifier = Modifier
                     .padding(top = 8.dp, bottom = 4.dp)
                     .size(150.dp),
                 isSpeaking = isSpeaking,
-                isThinking = isThinking
+                isThinking = isThinking,
+                isListening = (handsFree == "on")
             )
             Row(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
                 IconButton(onClick = {
@@ -186,6 +188,7 @@ fun JarvisApp() {
             text = when {
                 isThinking -> "processando…"
                 isSpeaking -> "falando…"
+                handsFree == "on" -> "escutando — fale \"jarvis\""
                 else -> "J.A.R.V.I.S PRO ULTRA v" + JarvisBrain.APP_VERSION + " — online"
             },
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp),
@@ -200,15 +203,28 @@ fun JarvisApp() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(messages) { m ->
-                Row(
+                val isUser = m.role == "user"
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (m.role == "user") Arrangement.End else Arrangement.Start
+                    horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
                 ) {
+                    Text(
+                        if (isUser) "SENHOR" else "J.A.R.V.I.S",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = if (isUser) CyanDim else Cyan.copy(alpha = 0.75f),
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 2.dp)
+                    )
                     Surface(
-                        color = if (m.role == "user") Cyan.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface,
+                        color = if (isUser) Cyan.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, HoloLine),
+                        shape = RoundedCornerShape(
+                            topStart = if (isUser) 12.dp else 3.dp,
+                            topEnd = if (isUser) 3.dp else 12.dp,
+                            bottomStart = 12.dp,
+                            bottomEnd = 12.dp
+                        ),
+                        border = BorderStroke(1.dp, if (isUser) CyanDim else HoloLine),
                         modifier = Modifier.widthIn(max = 320.dp)
                     ) {
                         Text(m.text, Modifier.padding(10.dp), fontSize = 14.sp, lineHeight = 19.sp)
@@ -292,6 +308,7 @@ fun JarvisApp() {
                 }
             }
         }
+    }
     }
 
     if (showSettings) {

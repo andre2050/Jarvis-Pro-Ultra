@@ -33,7 +33,8 @@ import kotlin.random.Random
 fun HologramFace(
     modifier: Modifier = Modifier,
     isSpeaking: Boolean = false,
-    isThinking: Boolean = false
+    isThinking: Boolean = false,
+    isListening: Boolean = false
 ) {
     var blink by remember { mutableFloatStateOf(1f) }        // 1 = aberto, 0 = fechado
     var lookX by remember { mutableFloatStateOf(0f) }
@@ -43,7 +44,7 @@ fun HologramFace(
 
     val blinkAnim by animateFloatAsState(blink, tween(90), label = "blink")
 
-    LaunchedEffect(isSpeaking, isThinking) {
+    LaunchedEffect(isSpeaking, isThinking, isListening) {
         var t = 0f
         while (true) {
             t += 0.05f
@@ -107,6 +108,24 @@ fun HologramFace(
             size = Size(r * 2, r * 2),
             style = Stroke(width = 2f, cap = StrokeCap.Round)
         )
+
+        // modo mãos-livres: três arcos orbitando quando está escutando
+        if (isListening) {
+            val rr = r * 1.16f
+            val rot = pulse * 360f
+            for (i in 0 until 3) {
+                drawArc(
+                    color = core.copy(alpha = 0.55f),
+                    startAngle = rot + i * 120f,
+                    sweepAngle = 40f,
+                    useCenter = false,
+                    topLeft = Offset(cx - rr, cy - rr),
+                    size = Size(rr * 2, rr * 2),
+                    style = Stroke(width = 3f, cap = StrokeCap.Round)
+                )
+            }
+            drawCircle(color = core.copy(alpha = 0.05f + 0.04f * pulse), radius = rr * 1.02f, center = Offset(cx, cy))
+        }
 
         // olhos
         val eyeW = r * 0.16f
