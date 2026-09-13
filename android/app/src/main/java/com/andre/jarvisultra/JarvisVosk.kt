@@ -36,12 +36,40 @@ object JarvisVosk {
 
     fun hasModel(ctx: Context): Boolean = File(modelDir(ctx), "conf").exists()
 
+    /** v3.1.1: o pacote de voz vem DENTRO do APK — copia dos assets pro armazenamento interno. */
+    private fun installFromAssets(ctx: Context): Boolean {
+        return try {
+            val dir = modelDir(ctx)
+            dir.deleteRecursively()
+            fun copiar(path: String) {
+                val itens = ctx.assets.list(path) ?: return
+                if (itens.isEmpty()) {
+                    val rel = path.removePrefix("vosk-model/")
+                    if (rel.isBlank()) return
+                    val f = File(dir, rel)
+                    f.parentFile?.mkdirs()
+                    ctx.assets.open(path).use { input -> f.outputStream().use { input.copyTo(it) } }
+                } else {
+                    itens.forEach { copiar(path + "/" + it) }
+                }
+            }
+            val raiz = ctx.assets.list("vosk-model") ?: return false
+            if (raiz.isEmpty()) return false
+            raiz.forEach { copiar("vosk-model/" + it) }
+            hasModel(ctx)
+        } catch (e: Exception) { false }
+    }
+
     /**
      * Baixa e instala o pacote de voz. Bloqueante — chamar fora da thread principal.
      * Retorna null se ficou pronto, ou a mensagem de erro do que deu errado.
      */
     fun ensureModel(ctx: Context, onProgress: (String) -> Unit = {}): String? {
         if (hasModel(ctx)) return null
+        // v3.1.1: instala direto do APK — instantâneo, sem depender de rede.
+        onProgress("instalando pacote de voz...")
+        if (installFromAssets(ctx)) return null
+        // Plano B (APK antigo / assets indisponíveis): download pela rede.
         val zip = File(ctx.cacheDir, "vosk-model.zip")
         var ultimoErro: String? = null
         for (url in MODEL_URLS) {
