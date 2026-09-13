@@ -129,17 +129,27 @@ class PainelConfig(tk.Toplevel):
         self.lbl_teste.config(text="testando…", fg="#9c8a86")
         threading.Thread(target=self._testar_chave, args=(chave,), daemon=True).start()
 
+    def _avalia(self, texto: str, cor: str):
+        """Atualiza o resultado na thread principal do tkinter (seguro)."""
+        self.after(0, lambda: self.lbl_teste.config(text=texto, fg=cor))
+
     def _testar_chave(self, chave: str):
         try:
             if not chave:
-                self.lbl_teste.config(text="cole a chave primeiro, senhor.", fg="#ff9a8f")
+                self._avalia("cole a chave primeiro, senhor.", "#ff9a8f")
                 return
             teste = [{"role": "user", "parts": [{"text": "Diga apenas: ok."}]}]
             r = gemini_client.turn(chave, "Você é um teste de conexão. Responda de forma curtíssima.", teste, None)
-            self.lbl_teste.config(text=f"✓ chave válida — modelo {r.model}", fg="#7dc98f")
-            self.app.recarregar_config()
+            self._avalia(f"✓ chave válida — modelo {r.model}", "#7dc98f")
+            self.after(0, self.app.recarregar_config)
         except Exception as e:
-            self.lbl_teste.config(text=f"✗ {str(e)[:70]}", fg="#ff9a8f")
+            msg = str(e)
+            if "API key not valid" in msg or "api key" in msg.lower():
+                self._avalia("✗ chave inválida — confira se copiou inteira (aistudio.google.com)", "#ff9a8f")
+            elif "Failed to establish" in msg or "Connection" in msg:
+                self._avalia("✗ sem internet — confira a conexão", "#ff9a8f")
+            else:
+                self._avalia(f"✗ {msg[:70]}", "#ff9a8f")
 
     def _testar_voz(self):
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
@@ -150,9 +160,9 @@ class PainelConfig(tk.Toplevel):
             info = updater.check_latest()
             texto = (f"Nova versão v{info['latest']} disponível! (instalada v{info['atual']})"
                      if info["update"] else f"{info['note']} (v{info['atual']})")
-            self.lbl_versao.config(text=texto)
+            self.after(0, lambda: self.lbl_versao.config(text=texto))
             if info["update"] and info["url"]:
-                __import__("webbrowser").open(info["url"])
+                self.after(0, lambda: __import__("webbrowser").open(info["url"]))
         threading.Thread(target=run, daemon=True).start()
 
     def _concluir(self):
