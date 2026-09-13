@@ -43,11 +43,11 @@ object GeminiClient {
     suspend fun turn(apiKey: String, systemPrompt: String, contents: JSONArray, tools: JSONArray?): GeminiResult {
         var lastError: IllegalStateException? = null
         for (m in MODELS) {
-            for (attempt in 1..2) {
+            for (attempt in 1..3) {
                 try {
                     return callModel(m, apiKey, systemPrompt, contents, tools)
                 } catch (e: UnknownHostException) {
-                    if (attempt == 2) {
+                    if (attempt == 3) {
                         throw IllegalStateException("⚠️ Sem conexão com a internet, senhor. Verifique o Wi-Fi/dados móveis e tente de novo.")
                     }
                     kotlinx.coroutines.delay(1200)
@@ -57,9 +57,18 @@ object GeminiClient {
                         lastError = e
                         break
                     }
+                    if (msg.contains("503") || msg.contains("429") || msg.contains("high demand", ignoreCase = true) || msg.contains("overloaded", ignoreCase = true)) {
+                        lastError = e
+                        if (attempt < 3) { kotlinx.coroutines.delay(1500L * attempt); continue }
+                        break
+                    }
                     throw e
                 }
             }
+        }
+        val base = lastError?.message ?: ""
+        if (base.contains("503") || base.contains("429") || base.contains("high demand", ignoreCase = true) || base.contains("overloaded", ignoreCase = true)) {
+            throw IllegalStateException("⚠️ Os servidores do Gemini estão sobrecarregados agora, senhor. Já tentei algumas vezes — aguarde um minuto e mande de novo.")
         }
         throw lastError ?: IllegalStateException("nenhum modelo disponível")
     }

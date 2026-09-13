@@ -8,9 +8,8 @@ import org.vosk.Model
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import java.io.File
-import java.io.FileInputStream
 import java.util.concurrent.TimeUnit
-import java.util.zip.ZipInputStream
+import java.util.zip.ZipFile
 
 /**
  * Voz hands-free + offline (v3.0.0): rede neural Vosk de reconhecimento de fala
@@ -48,13 +47,14 @@ object JarvisVosk {
         for (url in MODEL_URLS) {
             try {
                 onProgress("baixando pacote de voz...")
+                var contentOk = false
                 http.newCall(Request.Builder().url(url).build()).execute().use { r ->
                     if (!r.isSuccessful) { ultimoErro = "servidor respondeu " + r.code; return@use }
                     val total = r.body!!.contentLength()
+                    var done = 0L
                     zip.outputStream().use { out ->
                         val input = r.body!!.byteStream()
                         val buf = ByteArray(16384)
-                        var done = 0L
                         var read = input.read(buf)
                         var lastPct = -1
                         while (read >= 0) {
@@ -67,31 +67,44 @@ object JarvisVosk {
                             read = input.read(buf)
                         }
                     }
+                    // Só considera OK se recebeu o total esperado (ou se o servidor não informou o tamanho).
+                    contentOk = (total <= 0) || (done >= total)
+                    if (!contentOk) ultimoErro = "conexão caiu no meio do download (recebido " + (done / 1024 / 1024) + "MB de " + (total / 1024 / 1024) + "MB)"
                 }
-                if (!zip.exists() || zip.length() < 1000000) { ultimoErro = "download incompleto"; continue }
+                if (!contentOk || !zip.exists() || zip.length() < 1000000) {
+                    zip.delete()
+                    if (ultimoErro == null) ultimoErro = "download incompleto"
+                    continue
+                }
+                onProgress("verificando pacote...")
+                // ZipFile valida o índice central do arquivo — detecta corrupção antes de gastar tempo extraindo.
+                val validZip = try { ZipFile(zip); true } catch (e: Exception) { ultimoErro = "arquivo baixado está corrompido"; false }
+                if (!validZip) { zip.delete(); continue }
                 onProgress("instalando pacote de voz...")
                 val dir = modelDir(ctx)
                 dir.deleteRecursively()
-                ZipInputStream(FileInputStream(zip)).use { zis ->
-                    var e = zis.nextEntry
-                    while (e != null) {
-                        val rel = e.name.removePrefix(ZIP_PREFIX)
-                        if (rel.isNotBlank()) {
+                var extraiu = false
+                try {
+                    ZipFile(zip).use { zf ->
+                        val entries = zf.entries()
+                        while (entries.hasMoreElements()) {
+                            val e = entries.nextElement()
+                            val rel = e.name.removePrefix(ZIP_PREFIX)
+                            if (rel.isBlank()) continue
                             val f = File(dir, rel)
-                            if (f.canonicalPath.startsWith(dir.canonicalPath)) {
-                                if (e.isDirectory) f.mkdirs() else {
-                                    f.parentFile?.mkdirs()
-                                    f.outputStream().use { zis.copyTo(it) }
-                                }
-                            }
+                            if (!f.canonicalPath.startsWith(dir.canonicalPath)) continue
+                            if (e.isDirectory) { f.mkdirs(); continue }
+                            f.parentFile?.mkdirs()
+                            zf.getInputStream(e).use { input -> f.outputStream().use { input.copyTo(it) } }
                         }
-                        zis.closeEntry()
-                        e = zis.nextEntry
                     }
+                    extraiu = true
+                } catch (e: Exception) {
+                    ultimoErro = "falha ao extrair: " + (e.message ?: "erro desconhecido")
                 }
                 zip.delete()
-                if (hasModel(ctx)) return null
-                ultimoErro = "pacote veio corrompido"
+                if (extraiu && hasModel(ctx)) return null
+                if (ultimoErro == null) ultimoErro = "pacote instalado mas o modelo não ficou completo"
             } catch (e: Exception) {
                 ultimoErro = (e.message ?: "erro de rede")
             }
