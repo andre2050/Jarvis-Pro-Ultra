@@ -24,7 +24,7 @@ import kotlin.random.Random
  * públicos diretamente por UDP (FallbackDns).
  */
 object GeminiClient {
-    private val MODELS = listOf("gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite")
+    private val MODELS = listOf("gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite")
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
     private val http = OkHttpClient.Builder()
@@ -43,14 +43,14 @@ object GeminiClient {
     suspend fun turn(apiKey: String, systemPrompt: String, contents: JSONArray, tools: JSONArray?): GeminiResult {
         var lastError: IllegalStateException? = null
         for (m in MODELS) {
-            for (attempt in 1..3) {
+            for (attempt in 1..2) {
                 try {
                     return callModel(m, apiKey, systemPrompt, contents, tools)
                 } catch (e: UnknownHostException) {
-                    if (attempt == 3) {
+                    if (attempt == 2) {
                         throw IllegalStateException("⚠️ Sem conexão com a internet, senhor. Verifique o Wi-Fi/dados móveis e tente de novo.")
                     }
-                    kotlinx.coroutines.delay(1200)
+                    kotlinx.coroutines.delay(800)
                 } catch (e: IllegalStateException) {
                     val msg = e.message ?: ""
                     if (msg.contains("404") || msg.contains("not found", ignoreCase = true) || msg.contains("not supported", ignoreCase = true)) {
@@ -59,7 +59,7 @@ object GeminiClient {
                     }
                     if (msg.contains("503") || msg.contains("429") || msg.contains("high demand", ignoreCase = true) || msg.contains("overloaded", ignoreCase = true)) {
                         lastError = e
-                        if (attempt < 3) { kotlinx.coroutines.delay(1500L * attempt); continue }
+                        if (attempt < 2) { kotlinx.coroutines.delay(1000); continue }
                         break
                     }
                     throw e
@@ -68,7 +68,7 @@ object GeminiClient {
         }
         val base = lastError?.message ?: ""
         if (base.contains("503") || base.contains("429") || base.contains("high demand", ignoreCase = true) || base.contains("overloaded", ignoreCase = true)) {
-            throw IllegalStateException("⚠️ Os servidores do Gemini estão sobrecarregados agora, senhor. Já tentei algumas vezes — aguarde um minuto e mande de novo.")
+            throw IllegalStateException("⚠️ Os servidores do Gemini estão sobrecarregados agora, senhor. Aguarde um minuto e mande de novo.")
         }
         throw lastError ?: IllegalStateException("nenhum modelo disponível")
     }
@@ -82,7 +82,7 @@ object GeminiClient {
                 if (tools != null && tools.length() > 0) {
                     put("tools", JSONArray().put(JSONObject().put("function_declarations", tools)))
                 }
-                put("generationConfig", JSONObject().put("temperature", 0.7).put("maxOutputTokens", 1024))
+                put("generationConfig", JSONObject().put("temperature", 0.7).put("maxOutputTokens", 2048))
             }
 
             val req = Request.Builder().url(url).post(body.toString().toRequestBody(JSON)).build()
