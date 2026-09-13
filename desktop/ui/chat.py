@@ -46,6 +46,7 @@ class ChatPanel(tk.Frame):
                                  relief=tk.SOLID)
         self.texto.tag_configure("sep", foreground=COR_CHAT, spacing1=2)
         self._marcador_digitando = None
+        self.transcricao: list[tuple[str, str, str]] = []  # (papel, hora, msg)
 
     # ---------- API ----------
 
@@ -54,6 +55,8 @@ class ChatPanel(tk.Frame):
         from datetime import datetime
         hora = datetime.now().strftime("%H:%M")
         self.esconder_digitando()
+        if papel in ("user", "jarvis", "erro"):
+            self.transcricao.append((papel, hora, msg))
         self.texto.configure(state=tk.NORMAL)
         self.texto.insert(tk.END, "\n", "sep")
         if papel == "sistema":
@@ -67,8 +70,31 @@ class ChatPanel(tk.Frame):
         self.texto.see(tk.END)
         self.texto.configure(state=tk.DISABLED)
 
+    def exportar(self) -> str | None:
+        """Salva a conversa num .txt e devolve o caminho (ou None se vazia)."""
+        if not self.transcricao:
+            return None
+        from datetime import datetime
+        from tkinter import filedialog
+        nome_padrao = f"jarvis-conversa-{datetime.now().strftime('%Y%m%d-%H%M')}.txt"
+        caminho = filedialog.asksaveasfilename(
+            defaultextension=".txt", initialfile=nome_padrao,
+            filetypes=[("Texto", "*.txt")], title="Salvar conversa")
+        if not caminho:
+            return None
+        quem = {"user": "VOCÊ", "jarvis": "J.A.R.V.I.S", "erro": "ERRO"}
+        with open(caminho, "w", encoding="utf-8") as f:
+            f.write(f"Conversa com J.A.R.V.I.S — Pro Ultra Desktop\n"
+                    f"Exportada em {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+                    + "=" * 50 + "\n\n")
+            for papel, hora, msg in self.transcricao:
+                f.write(f"[{hora}] {quem.get(papel, papel)}:\n{msg}\n\n")
+        return caminho
+
     def mostrar_digitando(self) -> None:
         self.esconder_digitando()
+        if papel in ("user", "jarvis", "erro"):
+            self.transcricao.append((papel, hora, msg))
         self.texto.configure(state=tk.NORMAL)
         self._marcador_digitando = self.texto.index(tk.END + "-1c")
         self.texto.insert(tk.END, f"J.A.R.V.I.S está pensando ···\n", "jarvis_hora")

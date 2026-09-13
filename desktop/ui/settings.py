@@ -80,6 +80,27 @@ class PainelConfig(tk.Toplevel):
                   fg="#ffe4de", bd=0, font=("Segoe UI", 9, "bold"), cursor="hand2",
                   padx=12, pady=4).pack(padx=10, pady=(2, 10), anchor="w")
 
+        # ---------- PAINEL DE MEMÓRIA ----------
+        self._secao("🧠 MEMÓRIAS DO J.A.R.V.I.S")
+        zona_m = tk.Frame(self, bg="#171012")
+        zona_m.pack(fill=tk.X, padx=24)
+        self.lista_mem = tk.Listbox(zona_m, bg="#0d0708", fg="#f2e6e4", bd=0,
+                                     highlightthickness=0, font=("Segoe UI", 9),
+                                     selectbackground="#a1160f", height=5, activestyle="none")
+        self.lista_mem.pack(fill=tk.X, padx=10, pady=(8, 4), side=tk.TOP)
+        barra_m = tk.Frame(zona_m, bg="#171012")
+        barra_m.pack(fill=tk.X, padx=10, pady=(0, 10))
+        tk.Button(barra_m, text="Apagar selecionada", command=self._apagar_memoria,
+                  bg="#33100c", fg="#ffe4de", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
+        tk.Button(barra_m, text="Apagar tudo", command=self._apagar_todas_memorias,
+                  bg="#33100c", fg="#ff9a8f", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=6)
+        self.lbl_mem_status = tk.Label(barra_m, text="", fg="#9c8a86", bg="#171012",
+                                       font=("Segoe UI", 9))
+        self.lbl_mem_status.pack(side=tk.LEFT, padx=8)
+        self._carregar_memorias()
+
         # ---------- WAKE WORD (rede neural local) ----------
         self._secao("🧠 WAKE WORD — 'HEY JARVIS'")
         zona_w = tk.Frame(self, bg="#171012")
@@ -173,6 +194,43 @@ class PainelConfig(tk.Toplevel):
 
     def _testar_voz(self):
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
+
+    # ==================== MEMÓRIA ====================
+
+    def _carregar_memorias(self):
+        from core import memory as mem
+        self.lista_mem.delete(0, tk.END)
+        self._memorias = mem.dados()
+        if not self._memorias:
+            self.lista_mem.insert(tk.END, "(nenhuma memória guardada ainda, senhor)")
+            self.lista_mem.config(fg="#9c8a86")
+        else:
+            self.lista_mem.config(fg="#f2e6e4")
+            for m in self._memorias[-30:]:
+                texto = f"{m.get('data', '')} — {m.get('texto', '')[:60]}"
+                self.lista_mem.insert(tk.END, texto)
+
+    def _apagar_memoria(self):
+        from core import memory as mem
+        sel = self.lista_mem.curselection()
+        if not sel:
+            self.lbl_mem_status.config(text="selecione uma memória na lista")
+            return
+        idx_lista = sel[0]
+        # mapeia a linha visível pra memória real (lista mostra as últimas 30)
+        m = self._memorias[-(self.lista_mem.size() - idx_lista)]
+        mem.esquecer(m.get("texto", ""))
+        self.lbl_mem_status.config(text="memória apagada")
+        self._carregar_memorias()
+
+    def _apagar_todas_memorias(self):
+        from core import memory as mem
+        from tkinter import messagebox
+        if messagebox.askyesno("J.A.R.V.I.S", "Apagar TODAS as memórias de longo prazo?",
+                               parent=self, icon="warning"):
+            mem.limpar()
+            self.lbl_mem_status.config(text="todas apagadas")
+            self._carregar_memorias()
 
     # ==================== WAKE WORD ====================
 

@@ -102,6 +102,9 @@ class JarvisApp(tk.Tk):
         self.chip.pack(side=tk.RIGHT, padx=(4, 0))
         self._chip_texto = "PRONTO"
 
+        tk.Button(topo, text="💾", command=self._exportar_conversa,
+                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                  font=("Segoe UI", 12), cursor="hand2").pack(side=tk.RIGHT, padx=6)
         self.btn_wake = tk.Button(topo, text="🧠 WAKE ?", command=self._alternar_wake,
                                   bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
                                   font=("Consolas", 9, "bold"), cursor="hand2")
@@ -199,14 +202,57 @@ class JarvisApp(tk.Tk):
     # ==================== CHAT ====================
 
     def _boas_vindas(self):
+        from datetime import datetime
         n_acoes = len(self.registro.names())
+
+        h = datetime.now().hour
+        if 5 <= h < 12:
+            saudacao = "Bom dia, senhor André"
+        elif 12 <= h < 18:
+            saudacao = "Boa tarde, senhor André"
+        else:
+            saudacao = "Boa noite, senhor André"
+
         self.chat.add("jarvis",
-                      "Sistemas online, senhor André. Reator de arco operando a plena capacidade.")
+                      f"{saudacao}. Sistemas online — reator de arco a plena capacidade.")
         if n_acoes:
             self.chat.add("sistema", f"{n_acoes} ações do Mark LIII fundidas ao meu arsenal.")
+
+        # ---- briefing do dia (primeira inicialização de hoje) ----
+        hoje = datetime.now().strftime("%Y-%m-%d")
+        primeiro_boot_do_dia = self.cfg.get("ultimo_boot") != hoje
+        self.cfg["ultimo_boot"] = hoje
+        config.save(self.cfg)
+        if primeiro_boot_do_dia:
+            threading.Thread(target=self._briefing_do_dia, daemon=True).start()
+
         if not config.api_key_ok(self.cfg):
             self.chat.add("sistema", "Cole sua chave do Gemini em ⚙ CONFIG para me dar um cérebro — "
                                      "é grátis em aistudio.google.com")
+
+    def _briefing_do_dia(self):
+        """Resumo local do dia (sem gastar API): data, clima e memórias recentes."""
+        try:
+            from datetime import datetime
+            from core import memory as mem
+            agora = datetime.now()
+            dias = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+                    "sexta-feira", "sábado", "domingo"]
+            data_txt = f"{dias[agora.weekday()]}, {agora.strftime('%d/%m/%Y')}"
+            partes = [f"Hoje é {data_txt}, {agora.strftime('%H:%M')}."]
+
+            clima = tools.execute("clima", {})
+            if "falha" not in clima and "não consegui" not in clima:
+                partes.append(clima)
+
+            mems = mem.dados()[-3:]
+            if mems:
+                partes.append("Lembrando o que importa: " + "; ".join(m["texto"] for m in mems))
+
+            briefing = " ".join(partes)
+            self.fila_eventos.put(("fala", briefing))
+        except Exception as e:
+            print(f"[briefing] {e}")
 
     def _enviar(self, texto: str | None = None):
         msg = (texto or self.entrada.get()).strip()
@@ -343,6 +389,13 @@ class JarvisApp(tk.Tk):
                             fg=RED_VIVO if ligado else TXT_FRACO)
         if not ligado:
             self.voz.falar("Voz desativada, senhor.")
+
+    def _exportar_conversa(self):
+        caminho = self.chat.exportar()
+        if caminho:
+            self.chat.add("sistema", f"💾 conversa salva em {caminho}")
+        else:
+            self.chat.add("sistema", "conversa vazia ou cancelada, senhor.")
 
     def _abrir_config(self):
         PainelConfig(self, self)

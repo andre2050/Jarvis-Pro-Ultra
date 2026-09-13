@@ -58,6 +58,32 @@ def listar() -> str:
     return f"{total} memória(s) guardada(s). Últimas:\n" + "\n".join(linhas)
 
 
+def dados() -> list[dict]:
+    """Lista crua de memórias (para o painel de memória do CONFIG)."""
+    return _load().get("memorias", [])
+
+
+def esquecer(texto: str) -> str:
+    """Apaga a memória cujo texto bate exatamente (para o painel)."""
+    data = _load()
+    mems = data.get("memorias", [])
+    for i, m in enumerate(mems):
+        if m.get("texto") == texto:
+            mems.pop(i)
+            data["memorias"] = mems
+            _save(data)
+            return f"Esquecida: {texto}"
+    return "não encontrei essa memória, senhor."
+
+
+def limpar() -> str:
+    data = _load()
+    n = len(data.get("memorias", []))
+    data["memorias"] = []
+    _save(data)
+    return f"{n} memória(s) apagada(s)."
+
+
 def buscar(query: str, limite: int = 5) -> list[str]:
     """Busca memórias relevantes por palavras-chave (sem acento/caixa alta)."""
     data = _load()
