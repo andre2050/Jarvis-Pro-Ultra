@@ -77,6 +77,22 @@ object JarvisPhoneTools {
             JSONObject().put("acao", JSONObject().put("type", "string").put("enum", JSONArray().put("ligar").put("desligar"))),
             JSONArray().put("acao")))
 
+        r.put(obj("definir_timer",
+            "Define um timer/cronômetro, ex: 'timer de 10 minutos'.",
+            JSONObject()
+                .put("minutos", JSONObject().put("type", "integer").put("description", "duração em minutos"))
+                .put("rotulo", JSONObject().put("type", "string").put("description", "nome, opcional")),
+            JSONArray().put("minutos")))
+
+        r.put(obj("pesquisar_web",
+            "Abre o navegador pesquisando algo no Google, ex: 'pesquisa previsão do tempo em São Paulo'.",
+            JSONObject().put("consulta", JSONObject().put("type", "string").put("description", "o que pesquisar")),
+            JSONArray().put("consulta")))
+
+        r.put(obj("listar_memorias",
+            "Conta o que o JARVIS lembra do usuário — fatos guardados na memória de longo prazo.",
+            JSONObject().put("quantidade", JSONObject().put("type", "integer").put("description", "quantos, padrão 10"))))
+
         r.put(obj("abrir_app",
             "Abre um app instalado pelo nome, ex: 'abre o YouTube'.",
             JSONObject().put("nome", JSONObject().put("type", "string").put("description", "nome do app")),
@@ -97,6 +113,9 @@ object JarvisPhoneTools {
             "definir_alarme" -> definirAlarme(ctx, args)
             "lanterna" -> lanterna(ctx, args)
             "abrir_app" -> abrirApp(ctx, args)
+            "definir_timer" -> definirTimer(ctx, args)
+            "pesquisar_web" -> pesquisarWeb(ctx, args)
+            "listar_memorias" -> listarMemorias(ctx, args)
             else -> null
         }
     } catch (e: Exception) {
@@ -239,5 +258,32 @@ object JarvisPhoneTools {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ctx.startActivity(i)
         return "abrindo " + pm.getApplicationLabel(alvo) + ", senhor."
+    }
+
+    private fun definirTimer(ctx: Context, args: JSONObject): String {
+        val min = args.optInt("minutos", -1)
+        if (min < 1 || min > 720) return "me diga os minutos, senhor, ex: 'timer de 10 minutos'."
+        val i = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+            putExtra(AlarmClock.EXTRA_LENGTH, min)
+            putExtra(AlarmClock.EXTRA_MESSAGE, args.optString("rotulo").ifBlank { "JARVIS" })
+            putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+        }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (i.resolveActivity(ctx.packageManager) == null) return "não achei o app de relógio, senhor."
+        ctx.startActivity(i)
+        return "timer de " + min + " minutos definido, senhor."
+    }
+
+    private fun pesquisarWeb(ctx: Context, args: JSONObject): String {
+        val q = args.optString("consulta")
+        if (q.isBlank()) return "o que pesquisar, senhor?"
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + URLEncoder.encode(q, "UTF-8"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "abrindo a pesquisa de '" + q + "', senhor."
+    }
+
+    private fun listarMemorias(ctx: Context, args: JSONObject): String {
+        val n = args.optInt("quantidade", 10).coerceIn(1, 20)
+        val ms = JarvisMemory.recent(ctx, n)
+        return if (ms.isEmpty()) "ainda não guardei nenhum fato, senhor — me peça pra lembrar de algo."
+        else "o que sei do senhor:\n- " + ms.joinToString("\n- ")
     }
 }

@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -82,6 +83,9 @@ fun JarvisApp() {
     var updateInfo by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
+    var handsFree by remember { mutableStateOf("off") }
+    var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
+    val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
 
     val voice = remember {
         JarvisVoice(ctx).also { v ->
@@ -218,6 +222,9 @@ fun JarvisApp() {
             tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
         ) {
+            if (handsFree != "off" && handsFree != "on") {
+                Text(handsFree, Modifier.padding(start = 12.dp, top = 4.dp), fontSize = 11.sp, color = CyanDim)
+            }
             suggestion?.let { s ->
                 TextButton(
                     onClick = { suggestion = null; send(s.message) },
@@ -230,6 +237,35 @@ fun JarvisApp() {
                 Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = {
+                    if (handsFree == "on") {
+                        voskSession?.stop(); voskSession = null; handsFree = "off"
+                    } else if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(ctx as Activity, arrayOf(android.Manifest.permission.RECORD_AUDIO), 78)
+                    } else {
+                        fun startSession() {
+                            try {
+                                voskSession = JarvisVosk.Session(ctx,
+                                    onCommand = { txt -> mainHandler.post { send(txt) } },
+                                    onWake = { mainHandler.post { voice.speak("Pois não, senhor?") } },
+                                    onState = { s -> mainHandler.post { handsFree = s } })
+                                voskSession?.start()
+                                handsFree = "on"
+                            } catch (e: Exception) { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
+                        }
+                        if (!JarvisVosk.hasModel(ctx)) {
+                            handsFree = "baixando pacote de voz (31MB)..."
+                            Thread {
+                                val ok = JarvisVosk.ensureModel(ctx)
+                                mainHandler.post { if (ok) startSession() else handsFree = "falha no download do pacote de voz" }
+                            }.start()
+                        } else startSession()
+                    }
+                }) {
+                    Icon(Icons.Default.Phone, contentDescription = "Mãos livres",
+                        tint = if (handsFree == "on") Cyan else CyanDim)
+                }
+
                 IconButton(onClick = {
                     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)

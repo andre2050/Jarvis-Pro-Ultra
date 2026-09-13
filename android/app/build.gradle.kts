@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "2.1.1"
+        versionCode = 10
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -45,6 +45,7 @@ android {
 }
 
 dependencies {
+    implementation("com.alphacephei:vosk-android:0.3.47")
     val composeBom = platform("androidx.compose:compose-bom:2024.05.00")
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.13.1")

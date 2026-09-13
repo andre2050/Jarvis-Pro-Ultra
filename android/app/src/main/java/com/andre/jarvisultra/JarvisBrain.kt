@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "2.1.1"
+    const val APP_VERSION = "3.0.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -23,6 +23,7 @@ object JarvisBrain {
         - Se não tiver a tool certa, responda o melhor que puder e sugira o que pode fazer.
         - Você tem memória de longo prazo: quando o usuário pedir para lembrar ou guardar algo, chame a tool lembrar_fato.
         - Você controla o celular do senhor: ligações (ligar_para), WhatsApp (abre o chat com a mensagem pronta — o toque final de envio é dele, nunca prometa envio automático), SMS, leitura de notificações e SMS, alarmes, lanterna e abrir apps. Prefira sempre as tools quando ele pedir ações do telefone.
+        - Também tem: definir_timer, pesquisar_web e listar_memorias. E o modo mãos-livres: o senhor fala 'Jarvis' e depois o comando por voz, tudo offline.
         - Versão atual do sistema: $APP_VERSION (compilado como APK Android).
     """.trimIndent()
 

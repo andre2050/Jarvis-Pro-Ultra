@@ -78,6 +78,18 @@ object JarvisMemory {
     }
 
     /** Registra toda interação (mensagem ou tool) pra alimentar a previsão de hábitos. */
+    /** Últimos fatos guardados (pra "o que você sabe de mim"). */
+    fun recent(ctx: Context, limit: Int = 10): List<String> {
+        ensure(ctx)
+        val d = db(ctx)
+        val out = mutableListOf<String>()
+        val c = d.rawQuery("SELECT text FROM memories ORDER BY created_at DESC LIMIT ?", arrayOf(limit.toString()))
+        while (c.moveToNext()) out.add(c.getString(0))
+        c.close()
+        d.close()
+        return out
+    }
+
     fun logInteraction(ctx: Context, kind: String, detail: String) {
         ensure(ctx)
         val d = db(ctx)
