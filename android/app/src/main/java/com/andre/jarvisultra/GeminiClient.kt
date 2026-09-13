@@ -24,7 +24,7 @@ import kotlin.random.Random
  * públicos diretamente por UDP (FallbackDns).
  */
 object GeminiClient {
-    private val MODELS = listOf("gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash")
+    private val MODELS = listOf("gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite")
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
     private val http = OkHttpClient.Builder()
