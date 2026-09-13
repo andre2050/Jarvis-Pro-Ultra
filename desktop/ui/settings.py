@@ -134,7 +134,8 @@ class PainelConfig(tk.Toplevel):
             if not chave:
                 self.lbl_teste.config(text="cole a chave primeiro, senhor.", fg="#ff9a8f")
                 return
-            r = gemini_client.turn(chave, "Responda apenas: ok.", [], None)
+            teste = [{"role": "user", "parts": [{"text": "Diga apenas: ok."}]}]
+            r = gemini_client.turn(chave, "Você é um teste de conexão. Responda de forma curtíssima.", teste, None)
             self.lbl_teste.config(text=f"✓ chave válida — modelo {r.model}", fg="#7dc98f")
             self.app.recarregar_config()
         except Exception as e:
