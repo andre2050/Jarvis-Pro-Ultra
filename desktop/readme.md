@@ -29,6 +29,30 @@ E tudo da v4.3.0 continua: reator animado, cérebro Gemini com function calling
 + Modo Turbo, 14 tools nativas (clima real via Open-Meteo, onde estou, música,
 volume, timer, memória de longo prazo…), voz pt-BR e painel de configurações.
 
+## 🧠 Cérebro: Gemini (nuvem) ou Ollama (100% offline)
+
+Em ⚙ CONFIG → CÉREBRO você escolhe:
+- **Gemini** — nuvem, precisa de chave gratuita (aistudio.google.com)
+- **Ollama** — roda no SEU computador, sem internet e sem custo:
+  1. Instale em https://ollama.com
+  2. Baixe um modelo: `ollama pull llama3.2` (sugestões com tools: llama3.1, qwen2.5, mistral-nemo)
+  3. ⚙ CONFIG → CÉREBRO → Ollama → Verificar → escolher o modelo
+
+A rede neural de wake word ("Hey Jarvis", openwakeword) e o Ollama fazem do
+JARVIS um assistente praticamente **sem nuvem**: só o wake word acorda o microfone,
+e o cérebro responde dentro da sua máquina.
+
+## 🎨 Temas do HUD
+
+⚙ CONFIG → TEMA: **Azul clássico** (J.A.R.V.I.S original), **Reator de Arco Vermelho**
+(herança v4.x) ou **Dourado Stark**. Aplica ao reiniciar.
+
+## 🪟 .exe para Windows
+
+Cada release `v*-desktop` é compilada automaticamente em .exe pelo GitHub Actions —
+baixe **JARVIS-Pro-Ultra.exe** direto na página de releases. Nada de Python
+instalado: é um arquivo único, é só abrir.
+
 ## ⚡ Quick Start
 
 ```bash

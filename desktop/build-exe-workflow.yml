@@ -1,0 +1,39 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags: ["v*-desktop"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        working-directory: desktop
+        run: |
+          pip install requests psutil numpy sounddevice pyttsx3 SpeechRecognition pyaudio comtypes pywin32
+          pip install openwakeword
+          pip install pyinstaller
+
+      - name: Build JARVIS-Pro-Ultra.exe
+        working-directory: desktop
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name "JARVIS-Pro-Ultra" --icon assets/icon.ico --add-data "actions;actions" --add-data "config;config" --collect-all sounddevice --hidden-import pyttsx3.drivers --hidden-import pyttsx3.drivers.sapi5 --hidden-import comtypes --hidden-import comtypes.stream --hidden-import win32com --hidden-import win32com.client main.py
+
+      - name: Anexar .exe à release
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag -or $tag -eq "main" -or $tag -eq "master") { $tag = "v5.0.0-desktop" }
+          gh release upload "$tag" "desktop/dist/JARVIS-Pro-Ultra.exe" --clobber --repo $env:GITHUB_REPOSITORY
+        env:
+          GH_TOKEN: ${{ github.token }}

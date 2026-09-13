@@ -16,14 +16,20 @@ try:
 except ImportError:
     TEM_PSUTIL = False
 
-# paleta Reator de Arco Vermelho (paleta global convertida de ciano pra vermelho)
-RED = "#ff2d20"
-RED_VIVO = "#ff5a4d"
-RED_DIM = "#a1160f"
-RED_ESCURO = "#3d0a07"
-FUNDO = "#0a0507"
-# tons de glow: do mais fraco ao mais forte
-GLOWS = ["#2a0705", "#3d0a07", "#560d09", "#7a110b", "#a1160f"]
+# v5.0.0: cores vêm do tema ativo (ui/theme.py) — azul clássico, vermelho ou gold
+from ui import theme as _tema
+
+
+def _T(chave):
+    return _tema.cor(chave)
+
+
+RED = _T("principal")        # constantes legais seguem apontando pro tema ativo
+RED_VIVO = _T("vivo")
+RED_DIM = _T("dim")
+RED_ESCURO = _T("escuro")
+FUNDO = _T("fundo")
+GLOWS = _tema.cores()["glows"]  # tons de glow: do mais fraco ao mais forte
 
 SEMANA = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
 

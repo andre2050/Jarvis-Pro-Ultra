@@ -11,6 +11,9 @@ DEFAULTS = {
     "voz_velocidade": 0.85,      # mais lenta = mais mordomo
     "voz_volume": 1.0,
     "usuario": "senhor",
+    "cerebro": "gemini",       # "gemini" (nuvem) | "ollama" (100% offline)
+    "ollama_model": "",        # ex: "llama3.2" — escolhido em ⚙ CONFIG
+    "tema": "classico",        # "classico" | "vermelho" | "gold"
 }
 
 

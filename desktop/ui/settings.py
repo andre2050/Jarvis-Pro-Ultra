@@ -14,8 +14,8 @@ class PainelConfig(tk.Toplevel):
         self.app = app
         self.configure(bg="#0d0708")
         self.title("Configurações — J.A.R.V.I.S")
-        self.geometry("560x600")
-        self.resizable(False, False)
+        self.geometry("580x760")
+        self.resizable(True, True)
         self.transient(master)
 
         self._montar()
@@ -29,6 +29,33 @@ class PainelConfig(tk.Toplevel):
         titulo = tk.Label(self, text="⚙ CONFIGURAÇÕES", font=("Consolas", 15, "bold"),
                          fg="#ff5a4d", **fundo)
         titulo.pack(pady=(18, 14))
+
+        # ---------- CÉREBRO (nuvem ou offline) ----------
+        self._secao("🧠 CÉREBRO — GEMINI (nuvem) ou OLLAMA (100% offline)")
+        zona_c = tk.Frame(self, bg="#171012")
+        zona_c.pack(fill=tk.X, padx=24)
+        self.var_cerebro = tk.StringVar(value=cfg.get("cerebro", "gemini"))
+        tk.Radiobutton(zona_c, text="Gemini (nuvem — precisa de chave)", variable=self.var_cerebro,
+                       value="gemini", bg="#171012", fg="#f2e6e4", selectcolor="#0d0708",
+                       activebackground="#171012", font=("Segoe UI", 9),
+                       anchor="w").pack(fill=tk.X, padx=10, anchor="w")
+        tk.Radiobutton(zona_c, text="Ollama (offline — roda no seu PC, sem internet)",
+                       variable=self.var_cerebro, value="ollama", command=self._atualiza_ollama,
+                       bg="#171012", fg="#f2e6e4", selectcolor="#0d0708",
+                       activebackground="#171012", font=("Segoe UI", 9),
+                       anchor="w").pack(fill=tk.X, padx=10, anchor="w")
+        self.lbl_ollama = tk.Label(zona_c, text="verificando…", fg="#9c8a86", bg="#171012",
+                                   font=("Segoe UI", 9), anchor="w", justify=tk.LEFT)
+        self.lbl_ollama.pack(fill=tk.X, padx=10, pady=(4, 2))
+        linha_o = tk.Frame(zona_c, bg="#171012")
+        linha_o.pack(fill=tk.X, padx=10, pady=(0, 8))
+        self.cmb_modelo = ttk.Combobox(linha_o, width=28, state="readonly",
+                                       font=("Segoe UI", 9))
+        self.cmb_modelo.pack(side=tk.LEFT)
+        tk.Button(linha_o, text="Verificar", command=self._verificar_ollama,
+                  bg="#a1160f", fg="#ffe4de", bd=0, font=("Segoe UI", 9, "bold"),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=8)
+        self._verificar_ollama()
 
         # ---------- CHAVE DO GEMINI ----------
         self._secao("🧠 CHAVE DO GEMINI")
@@ -134,6 +161,19 @@ class PainelConfig(tk.Toplevel):
                   bg="#171012", fg="#ff5a4d", bd=0, font=("Segoe UI", 9),
                   cursor="hand2", padx=12, pady=4).pack(padx=10, pady=(0, 10), anchor="w")
 
+        # ---------- TEMA ----------
+        self._secao("🎨 TEMA DO HUD (aplica ao reiniciar)")
+        zona_t = tk.Frame(self, bg="#171012")
+        zona_t.pack(fill=tk.X, padx=24)
+        self.var_tema = tk.StringVar(value=cfg.get("tema", "classico"))
+        for rot, desc in (("classico", "Azul holográfico (J.A.R.V.I.S original)"),
+                          ("vermelho", "Reator de Arco Vermelho (v4.x)"),
+                          ("gold", "Dourado Stark MK III")):
+            tk.Radiobutton(zona_t, text=desc, variable=self.var_tema, value=rot,
+                           bg="#171012", fg="#f2e6e4", selectcolor="#0d0708",
+                           activebackground="#171012", font=("Segoe UI", 9),
+                           anchor="w").pack(fill=tk.X, padx=10, anchor="w")
+
         # ---------- SOBRE ----------
         self._secao("ℹ SOBRE")
         zona4 = tk.Frame(self, bg="#171012")
@@ -166,6 +206,9 @@ class PainelConfig(tk.Toplevel):
         cfg["gemini_api_key"] = chave
         cfg["voz_ativa"] = self.var_voz.get()
         cfg["voz_velocidade"] = float(self.vel.get())
+        cfg["cerebro"] = self.var_cerebro.get()
+        cfg["ollama_model"] = self.cmb_modelo.get()
+        cfg["tema"] = self.var_tema.get()
         config.save(cfg)
         self.lbl_teste.config(text="testando…", fg="#9c8a86")
         threading.Thread(target=self._testar_chave, args=(chave,), daemon=True).start()
@@ -194,6 +237,35 @@ class PainelConfig(tk.Toplevel):
 
     def _testar_voz(self):
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
+
+    # ==================== CÉREBRO / OLLAMA ====================
+
+    def _verificar_ollama(self):
+        def run():
+            from core import ollama_client
+            try:
+                if ollama_client.disponivel():
+                    modelos = ollama_client.modelos()
+                    self.after(0, lambda: self._mostra_ollama(modelos))
+                else:
+                    self.after(0, lambda: self.lbl_ollama.config(
+                        text="Ollama não encontrado. Instale em ollama.com, depois `ollama pull llama3.2`"))
+            except Exception as e:
+                self.after(0, lambda: self.lbl_ollama.config(text=f"erro: {e}"))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _mostra_ollama(self, modelos: list):
+        if not modelos:
+            self.lbl_ollama.config(text="Ollama online, mas sem modelos. Rode `ollama pull llama3.2`")
+            self.cmb_modelo["values"] = []
+            return
+        self.cmb_modelo["values"] = modelos
+        atual = config.load().get("ollama_model", "")
+        self.cmb_modelo.set(atual if atual in modelos else modelos[0])
+        self.lbl_ollama.config(text=f"✓ Ollama online — {len(modelos)} modelo(s) disponível(is)")
+
+    def _atualiza_ollama(self):
+        self._verificar_ollama()
 
     # ==================== MEMÓRIA ====================
 
@@ -276,6 +348,9 @@ class PainelConfig(tk.Toplevel):
         cfg["gemini_api_key"] = self.var_chave.get().strip()
         cfg["voz_ativa"] = self.var_voz.get()
         cfg["voz_velocidade"] = float(self.vel.get())
+        cfg["cerebro"] = self.var_cerebro.get()
+        cfg["ollama_model"] = self.cmb_modelo.get()
+        cfg["tema"] = self.var_tema.get()
         config.save(cfg)
         sync_api_keys(cfg)
         self.app.recarregar_config()

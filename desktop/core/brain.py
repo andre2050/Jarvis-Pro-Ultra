@@ -6,7 +6,7 @@ devolvemos -> resposta final. Mesma arquitetura do Android v4.3.0.
 import threading
 import time
 
-from . import gemini_client, memory, perception, tools
+from . import gemini_client, memory, ollama_client, perception, tools
 from .adapters import normaliza_schema
 from version import __version__
 
@@ -69,9 +69,9 @@ class TurnResult:
         self.tools_used = tools_used
 
 
-def process(api_key: str, history: list, user_message: str) -> TurnResult:
-    """Processa uma mensagem: roda o loop de function calling e devolve a
-    resposta final + histórico atualizado (incluindo as rodadas de tool)."""
+def process(cfg: dict, history: list, user_message: str) -> TurnResult:
+    """Processa uma mensagem com o cérebro ativo — Gemini (nuvem) ou Ollama
+    (100% offline). Mesmo histórico canônico; mesmo loop de function calling."""
     history.append({"role": "user", "parts": [{"text": user_message}]})
 
     memory.ensure()
@@ -82,7 +82,11 @@ def process(api_key: str, history: list, user_message: str) -> TurnResult:
     if mems:
         prompt += "\nMemórias de longo prazo sobre o senhor (use quando relevante):\n- " + "\n- ".join(mems)
 
+    if cfg.get("cerebro") == "ollama":
+        return _process_ollama(cfg, history, prompt)
+
     tools_used = []
+    api_key = cfg.get("gemini_api_key", "")
 
     for _round in range(1, MAX_TOOL_ROUNDS + 1):
         result = gemini_client.turn(api_key, prompt, history, todas_declaracoes())
@@ -119,11 +123,78 @@ def process(api_key: str, history: list, user_message: str) -> TurnResult:
                       history, tools_used)
 
 
-def process_async(api_key: str, history: list, user_message: str, callback):
+# ==================== OLLAMA (offline) ====================
+
+def _para_ollama(history: list) -> list:
+    """Converte o histórico canônico (formato Gemini) pro formato Ollama."""
+    out = []
+    for h in history:
+        role = "assistant" if h.get("role") == "model" else h.get("role", "user")
+        for p in h.get("parts", []):
+            if "text" in p:
+                out.append({"role": role, "content": p["text"]})
+            elif "functionCall" in p:
+                fc = p["functionCall"]
+                out.append({"role": "assistant", "content": "",
+                            "tool_calls": [{"function": {
+                                "name": fc.get("name", ""),
+                                "arguments": fc.get("args") or {}}}]})
+            elif "functionResponse" in p:
+                fr = p["functionResponse"]
+                out.append({"role": "tool", "tool_name": fr.get("name", ""),
+                            "content": str(fr.get("response", {}).get("result", ""))})
+    return out
+
+
+def _process_ollama(cfg: dict, history: list, prompt: str) -> TurnResult:
+    """Loop de function calling rodando em modelo local — sem internet."""
+    modelo = cfg.get("ollama_model") or "llama3.2"
+    tools_used = []
+    decls = [{"name": d["name"], "description": d["description"],
+              "parameters": d["parameters"]} for d in todas_declaracoes()]
+
+    if not ollama_client.disponivel():
+        history.append({"role": "model", "parts": [{"text": "(offline)"}]})
+        return TurnResult("O Ollama não está respondindo, senhor. Rode `ollama serve` "
+                          "(ou abra o app do Ollama) e tente de novo — ou volte ao "
+                          "Gemini em ⚙ CONFIG.", history, tools_used)
+
+    for _round in range(1, MAX_TOOL_ROUNDS + 1):
+        try:
+            res = ollama_client.chat(modelo, _para_ollama(history), tools=decls, system=prompt)
+        except Exception as e:
+            history.append({"role": "model", "parts": [{"text": "(erro)"}]})
+            return TurnResult(f"Falha ao falar com o Ollama: {e}", history, tools_used)
+
+        if not res["tool_calls"]:
+            texto = res["texto"] or "(silêncio pensativo...)"
+            history.append({"role": "model", "parts": [{"text": texto}]})
+            return TurnResult(texto, history, tools_used)
+
+        # registra as chamadas no histórico canônico (mesmo formato do Gemini)
+        history.append({"role": "model", "parts": [
+            {"functionCall": {"name": c["name"], "args": c["args"]}} for c in res["tool_calls"]]})
+        resp_parts = []
+        for c in res["tool_calls"]:
+            try:
+                output = _executa_tool(c["name"], c["args"])
+            except Exception as e:
+                output = f"erro ao executar '{c['name']}': {e}"
+            memory.log_interaction(c["name"], str(output)[:80])
+            tools_used.append(c["name"])
+            resp_parts.append({"functionResponse": {"name": c["name"],
+                                                    "response": {"result": output}}})
+        history.append({"role": "user", "parts": resp_parts})
+
+    return TurnResult("Cheguei ao limite de tools num único turno, senhor — que tal quebrar a pergunta?",
+                      history, tools_used)
+
+
+def process_async(cfg: dict, history: list, user_message: str, callback):
     """Roda o turno numa thread; callback(TurnResult ou RuntimeError) no fim."""
     def run():
         try:
-            callback(process(api_key, history, user_message))
+            callback(process(cfg, history, user_message))
         except Exception as e:
             callback(e)
     threading.Thread(target=run, daemon=True).start()

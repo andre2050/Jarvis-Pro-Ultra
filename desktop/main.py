@@ -17,7 +17,8 @@ from core import brain, config, tools, confirm
 from core.action_loader import discover_actions
 from core.adapters import PlayerAdapter, SessionMemoryAdapter
 from core.config import sync_api_keys
-from ui.reactor import ArcReactorHud, RED, RED_VIVO, RED_DIM, FUNDO
+from ui import theme
+from ui.reactor import ArcReactorHud
 from ui.chat import ChatPanel
 from ui.settings import PainelConfig
 from voice.tts import Voz
@@ -25,26 +26,22 @@ from voice import stt
 from voice.wakelistener import WakeListener
 from version import APP_NAME, __version__
 
-# raiz do projeto no path (as ações importam `config` e `core`)
-RAIZ = Path(__file__).resolve().parent
+# raiz do projeto no path — dentro do .exe vira a pasta temporária do PyInstaller
+RAIZ = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
-
-FUNDO_JANELA = "#080506"
-FUNDO_PAINEL = "#0d0708"
-TXT_FRACO = "#9c8a86"
-TXT_CLARO = "#f2e6e4"
-
 
 class JarvisApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{APP_NAME} v{__version__}")
-        self.configure(bg=FUNDO_JANELA)
+        self.configure(bg=theme.cor("janela_bg"))
         self.geometry("1120x760")
         self.minsize(960, 660)
 
         self.cfg = config.load()
+        theme.usar(self.cfg.get("tema", "classico"))
+        self.cor = theme.cor            # paleta do tema ativo (muda em ⚙ CONFIG)
         sync_api_keys(self.cfg)          # ações do Mark LIII leem config/api_keys.json
         self.voz = Voz(self.cfg)
         self.historico: list = []
@@ -89,40 +86,46 @@ class JarvisApp(tk.Tk):
 
     def _montar_layout(self):
         # ---- barra superior ----
-        topo = tk.Frame(self, bg=FUNDO_PAINEL, height=54)
+        topo = tk.Frame(self, bg=self.cor("painel_bg"), height=54)
         topo.pack(fill=tk.X)
         topo.pack_propagate(False)
         tk.Label(topo, text="J.A.R.V.I.S — PRO ULTRA", font=("Consolas", 14, "bold"),
-                 fg=RED_VIVO, bg=FUNDO_PAINEL).pack(side=tk.LEFT, padx=(18, 4))
+                 fg=self.cor("vivo"), bg=self.cor("painel_bg")).pack(side=tk.LEFT, padx=(18, 4))
         tk.Label(topo, text=f"DESKTOP v{__version__}", font=("Consolas", 9),
-                 fg=TXT_FRACO, bg=FUNDO_PAINEL).pack(side=tk.LEFT, pady=(6, 0))
+                 fg=self.cor("txt_fraco"), bg=self.cor("painel_bg")).pack(side=tk.LEFT, pady=(6, 0))
+
+        # relógio vivo
+        self.lbl_relogio = tk.Label(topo, text="", font=("Consolas", 9),
+                                     bg=self.cor("painel_bg"), fg=self.cor("txt_fraco"))
+        self.lbl_relogio.pack(side=tk.RIGHT, padx=(0, 14))
+        self._tick_relogio()
 
         # chip de status pulsante
-        self.chip = tk.Canvas(topo, width=120, height=26, bg=FUNDO_PAINEL, highlightthickness=0)
+        self.chip = tk.Canvas(topo, width=120, height=26, bg=self.cor("painel_bg"), highlightthickness=0)
         self.chip.pack(side=tk.RIGHT, padx=(4, 0))
         self._chip_texto = "PRONTO"
 
         tk.Button(topo, text="💾", command=self._exportar_conversa,
-                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                  bg=self.cor("painel_bg"), fg=self.cor("vivo"), bd=0,
                   font=("Segoe UI", 12), cursor="hand2").pack(side=tk.RIGHT, padx=6)
         self.btn_wake = tk.Button(topo, text="🧠 WAKE ?", command=self._alternar_wake,
-                                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                                  bg=self.cor("painel_bg"), fg=self.cor("vivo"), bd=0,
                                   font=("Consolas", 9, "bold"), cursor="hand2")
         self.btn_wake.pack(side=tk.RIGHT, padx=6)
         self.btn_voz = tk.Button(topo, text="🎙 VOZ ON", command=self._alternar_voz,
-                                 bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                                 bg=self.cor("painel_bg"), fg=self.cor("vivo"), bd=0,
                                  font=("Consolas", 9, "bold"), cursor="hand2")
         self.btn_voz.pack(side=tk.RIGHT, padx=6)
         tk.Button(topo, text="⚙ CONFIG", command=self._abrir_config,
-                  bg=FUNDO_PAINEL, fg=RED_VIVO, bd=0,
+                  bg=self.cor("painel_bg"), fg=self.cor("vivo"), bd=0,
                   font=("Consolas", 9, "bold"), cursor="hand2").pack(side=tk.RIGHT, padx=6)
         self._pulsar_chip()
 
         # ---- corpo: reator (esq) + chat (dir) ----
-        corpo = tk.Frame(self, bg=FUNDO_JANELA)
+        corpo = tk.Frame(self, bg=self.cor("janela_bg"))
         corpo.pack(fill=tk.BOTH, expand=True)
 
-        esquerda = tk.Frame(corpo, bg=FUNDO_PAINEL, width=460)
+        esquerda = tk.Frame(corpo, bg=self.cor("painel_bg"), width=460)
         esquerda.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 6), pady=10)
         esquerda.pack_propagate(False)
         self.reator = ArcReactorHud(esquerda, size=430)
@@ -130,32 +133,41 @@ class JarvisApp(tk.Tk):
 
         # leituras vivas embaixo do reator
         self.lbl_leituras = tk.Label(esquerda, text="inicializando sensores…",
-                                     font=("Consolas", 9), fg=RED_DIM, bg=FUNDO_PAINEL)
+                                     font=("Consolas", 9), fg=self.cor("dim"), bg=self.cor("painel_bg"))
         self.lbl_leituras.pack(pady=(4, 12))
         tk.Label(esquerda, text="F4 alterna a voz  ·  senhor",
-                 font=("Consolas", 8), fg=TXT_FRACO, bg=FUNDO_PAINEL).pack(pady=(0, 14))
+                 font=("Consolas", 8), fg=self.cor("txt_fraco"), bg=self.cor("painel_bg")).pack(pady=(0, 14))
         self.after(2000, self._atualizar_leituras)
 
-        direita = tk.Frame(corpo, bg=FUNDO_PAINEL)
+        direita = tk.Frame(corpo, bg=self.cor("painel_bg"))
         direita.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10), pady=10)
         self.chat = ChatPanel(direita)
         self.chat.pack(fill=tk.BOTH, expand=True)
 
+        # ---- chips de atalho ----
+        chips = tk.Frame(direita, bg=self.cor("chat_bg"))
+        chips.pack(fill=tk.X, padx=10, pady=(0, 4))
+        for rotulo in ("Clima", "Status", "Memórias", "Resumir arquivo"):
+            tk.Button(chips, text=rotulo, command=lambda r=rotulo: self._chip(r),
+                      bg=self.cor("painel2"), fg=self.cor("vivo"), bd=0,
+                      font=("Segoe UI", 8, "bold"), cursor="hand2",
+                      padx=8, pady=2).pack(side=tk.LEFT, padx=(0, 6))
+
         # ---- barra de entrada ----
-        barra = tk.Frame(direita, bg="#171012")
+        barra = tk.Frame(direita, bg=self.cor("painel2"))
         barra.pack(fill=tk.X, padx=10, pady=(0, 10))
-        self.entrada = tk.Entry(barra, bg="#1d1214", fg=TXT_CLARO, bd=0,
-                                insertbackground=RED_VIVO, font=("Segoe UI", 12))
+        self.entrada = tk.Entry(barra, bg=self.cor("entrada_bg"), fg=self.cor("txt_claro"), bd=0,
+                                insertbackground=self.cor("vivo"), font=("Segoe UI", 12))
         self.entrada.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(12, 8), pady=10, ipady=8)
         self.entrada.bind("<Return>", lambda e: self._enviar())
 
         if stt.DISPONIVEL:
             self.btn_mic = tk.Button(barra, text="🎙", command=lambda: self._ouvir(pausar_wake=True),
-                                     bg="#171012", fg=RED_VIVO, bd=0,
+                                     bg=self.cor("painel2"), fg=self.cor("vivo"), bd=0,
                                      font=("Segoe UI", 13), cursor="hand2")
             self.btn_mic.pack(side=tk.LEFT, padx=(0, 6), pady=6)
-        tk.Button(barra, text="ENVIAR ➤", command=self._enviar, bg="#a1160f",
-                  fg="#ffe4de", bd=0, font=("Consolas", 10, "bold"),
+        tk.Button(barra, text="ENVIAR ➤", command=self._enviar, bg=self.cor("dim"),
+                  fg=self.cor("fg_dim"), bd=0, font=("Consolas", 10, "bold"),
                   cursor="hand2").pack(side=tk.LEFT, padx=(0, 10), pady=8)
 
         self._atualiza_botao_wake()
@@ -171,6 +183,13 @@ class JarvisApp(tk.Tk):
         self.chip.create_text(62, 15, text=self._chip_texto, fill=TXT_FRACO,
                               font=("Consolas", 9, "bold"))
         self.after(500, self._pulsar_chip)
+
+    def _tick_relogio(self):
+        from datetime import datetime
+        dias = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
+        d = datetime.now()
+        self.lbl_relogio.config(text=f"{dias[d.weekday()]} {d.strftime('%d/%m')} · {d.strftime('%H:%M:%S')}")
+        self.after(1000, self._tick_relogio)
 
     def _status(self, texto: str, pensando=False, ouvindo=False, falando=False):
         self._chip_texto = texto.upper()
@@ -193,11 +212,11 @@ class JarvisApp(tk.Tk):
 
     def _atualiza_botao_wake(self):
         if self.wake.ligado:
-            self.btn_wake.config(text="🧠 HEY JARVIS ON", fg=RED_VIVO)
+            self.btn_wake.config(text="🧠 HEY JARVIS ON", fg=self.cor("vivo"))
         elif self.wake.disponivel:
-            self.btn_wake.config(text="🧠 HEY JARVIS OFF", fg=TXT_FRACO)
+            self.btn_wake.config(text="🧠 HEY JARVIS OFF", fg=self.cor("txt_fraco"))
         else:
-            self.btn_wake.config(text="🧠 WAKE ? (CONFIG)", fg=TXT_FRACO)
+            self.btn_wake.config(text="🧠 WAKE ? (CONFIG)", fg=self.cor("txt_fraco"))
 
     # ==================== CHAT ====================
 
@@ -217,6 +236,9 @@ class JarvisApp(tk.Tk):
                       f"{saudacao}. Sistemas online — reator de arco a plena capacidade.")
         if n_acoes:
             self.chat.add("sistema", f"{n_acoes} ações do Mark LIII fundidas ao meu arsenal.")
+        if self.cfg.get("cerebro") == "ollama":
+            self.chat.add("sistema", f"🧠 Cérebro OFFLINE: {self.cfg.get('ollama_model')} via Ollama — "
+                                     "nada sai deste computador.")
 
         # ---- briefing do dia (primeira inicialização de hoje) ----
         hoje = datetime.now().strftime("%Y-%m-%d")
@@ -254,11 +276,27 @@ class JarvisApp(tk.Tk):
         except Exception as e:
             print(f"[briefing] {e}")
 
+    def _chip(self, rotulo: str):
+        pedido = {"Clima": "qual o clima agora?",
+                 "Status": "me dá o status do computador",
+                 "Memórias": "liste minhas memórias",
+                 "Resumir arquivo": "resuma o arquivo "}.get(rotulo, rotulo.lower())
+        if rotulo == "Resumir arquivo":
+            self.entrada.delete(0, tk.END)
+            self.entrada.insert(0, pedido)
+            self.entrada.focus_set()
+        else:
+            self._enviar(pedido)
+
     def _enviar(self, texto: str | None = None):
         msg = (texto or self.entrada.get()).strip()
         if not msg or self._ocupado:
             return
-        if not config.api_key_ok(self.cfg):
+        if self.cfg.get("cerebro") == "ollama":
+            if not self.cfg.get("ollama_model"):
+                self._abrir_config()
+                return
+        elif not config.api_key_ok(self.cfg):
             self._abrir_config()
             return
         self.entrada.delete(0, tk.END)
@@ -270,7 +308,7 @@ class JarvisApp(tk.Tk):
         def retorno(resultado):
             self.fila_eventos.put(resultado)
 
-        brain.process_async(self.cfg["gemini_api_key"], self.historico, msg, retorno)
+        brain.process_async(self.cfg, self.historico, msg, retorno)
 
     def _ouvir(self, pausar_wake: bool = False):
         if self._ocupado:
@@ -386,7 +424,7 @@ class JarvisApp(tk.Tk):
         ligado = self.voz.alternar()
         config.save(self.cfg)
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if ligado else 'OFF'}",
-                            fg=RED_VIVO if ligado else TXT_FRACO)
+                            fg=self.cor("vivo") if ligado else TXT_FRACO)
         if not ligado:
             self.voz.falar("Voz desativada, senhor.")
 
@@ -406,7 +444,7 @@ class JarvisApp(tk.Tk):
         self.voz.config = self.cfg
         self.voz.enabled = bool(self.cfg.get("voz_ativa", True))
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if self.voz.enabled else 'OFF'}",
-                            fg=RED_VIVO if self.voz.enabled else TXT_FRACO)
+                            fg=self.cor("vivo") if self.voz.enabled else TXT_FRACO)
         self._atualiza_botao_wake()
 
     def _sair(self):
