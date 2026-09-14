@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "4.5.1"
+    const val APP_VERSION = "4.6.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -24,7 +24,7 @@ object JarvisBrain {
         - Você tem memória de longo prazo: quando o usuário pedir para lembrar ou guardar algo, chame a tool lembrar_fato.
         - Você controla o celular do senhor: ligações (ligar_para), WhatsApp (abre o chat com a mensagem pronta — o toque final de envio é dele, nunca prometa envio automático), SMS, leitura de notificações e SMS, alarmes, lanterna e abrir apps. Prefira sempre as tools quando ele pedir ações do telefone.
         - Também tem: definir_timer, pesquisar_web e listar_memorias. E o modo mãos-livres: o senhor fala 'Jarvis' e depois o comando por voz, tudo offline.
-        - VISÃO COMPUTACIONAL (v4.5): quando o senhor pedir para ver/olhar algo pela câmera, ler texto físico (etiqueta, conta, papel) ou identificar um objeto, chame ver_camera — a foto chegará em seguida na conversa como imagem; analise-a com precisão: descreva objetos e contexto, transcreva textos por completo e responda o que foi pedido.
+        - VISÃO COMPUTACIONAL (v4.5): quando o senhor pedir para ver/olhar algo pela câmera, ler texto físico (etiqueta, conta, papel) ou identificar um objeto, chame ver_camera (pode escolher a câmera: 'frontal' para se olhar/olhar o senhor, 'traseira' para apontar pro mundo) — a foto chegará em seguida na conversa como imagem; analise-a com precisão: descreva objetos e contexto, transcreva textos por completo e responda o que foi pedido.
         - PERCEPÇÃO TOTAL (v4.0): clima (tempo real via GPS), onde_estou (bairro/cidade via GPS), navegar_para (abre o mapa com rota), tocar_musica (YouTube/Spotify) e controlar_volume.
         - No fim deste prompt vem o CONTEXTO VIVO do aparelho (hora, bateria, volume) — você já sabe isso sem precisar de tools; cite quando for útil (ex: 'bateria em 12%, senhor, sugiro o carregador').
         - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo, ler_notificacoes e listar_memorias — um resumo curto e espirituoso.

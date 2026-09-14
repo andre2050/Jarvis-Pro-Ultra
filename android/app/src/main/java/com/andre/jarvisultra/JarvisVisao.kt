@@ -17,8 +17,8 @@ import java.io.ByteArrayOutputStream
  */
 object JarvisVisao {
 
-    /** Callback registrado pela UI: abre a câmera com a pergunta pendente. */
-    @Volatile var onCaptureRequest: ((pergunta: String?) -> Unit)? = null
+    /** Callback registrado pela UI: abre a câmera com a pergunta pendente e a câmera escolhida (frontal/traseira). */
+    @Volatile var onCaptureRequest: ((pergunta: String?, camera: String?) -> Unit)? = null
 
     fun declarations(): JSONArray {
         val ver = JSONObject()
@@ -48,6 +48,18 @@ object JarvisVisao {
                                         "Se não disser nada, apenas descreva o que vê de forma útil."
                                 )
                         )
+                        .put(
+                            "camera",
+                            JSONObject()
+                                .put("type", "string")
+                                .put("enum", JSONArray().put("frontal").put("traseira"))
+                                .put(
+                                    "description",
+                                    "Qual câmera usar: 'frontal' (selfie — para o JARVIS olhar o senhor ou o que está " +
+                                        "atrás/em volta do celular) ou 'traseira' (câmera principal, padrão). " +
+                                        "Se o senhor disser 'se olhe', 'olhe pra mim', use frontal."
+                                )
+                        )
                     )
             )
         return JSONArray().put(ver)
@@ -57,9 +69,10 @@ object JarvisVisao {
     fun execute(ctx: Context, name: String, args: JSONObject): String? {
         if (name == "ver_camera") {
             val pergunta = args.optString("pergunta").takeIf { it.isNotBlank() }
+            val camera = args.optString("camera").takeIf { it.isNotBlank() }
             val cb = onCaptureRequest
                 ?: return "câmera indisponível no momento, senhor — tente pelo botão de foto na barra de comando."
-            cb(pergunta)
+            cb(pergunta, camera)
             return "câmera aberta, senhor. Aponte para o alvo e toque no botão de foto — assim que capturar, eu analiso."
         }
         return null

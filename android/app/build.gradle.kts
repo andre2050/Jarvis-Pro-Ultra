@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 25
-        versionName = "4.5.1"
+        versionCode = 26
+        versionName = "4.6.0"
     }
 
     signingConfigs {
@@ -55,6 +55,11 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    // Câmera nativa v4.6.0 (frontal + traseira)
+    implementation("androidx.camera:camera-core:1.3.3")
+    implementation("androidx.camera:camera-camera2:1.3.3")
+    implementation("androidx.camera:camera-lifecycle:1.3.3")
+    implementation("androidx.camera:camera-view:1.3.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

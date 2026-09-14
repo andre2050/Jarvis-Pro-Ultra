@@ -104,7 +104,7 @@ fun JarvisApp() {
     var handsFree by remember { mutableStateOf("off") }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
     // --- VISÃO COMPUTACIONAL v4.5.0 ---
-    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingFacing by remember { mutableStateOf(androidx.camera.core.CameraSelector.LENS_FACING_BACK) }
     var visaoPergunta by remember { mutableStateOf<String?>(null) }
     val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
 
@@ -132,7 +132,8 @@ fun JarvisApp() {
                 android.Manifest.permission.READ_CONTACTS,
                 android.Manifest.permission.SEND_SMS,
                 android.Manifest.permission.READ_SMS,
-                android.Manifest.permission.ACCESS_FINE_LOCATION
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.CAMERA
             )) {
                 if (ContextCompat.checkSelfPermission(ctx, p) != PackageManager.PERMISSION_GRANTED) pedidas.add(p)
             }
@@ -179,22 +180,40 @@ fun JarvisApp() {
         }
     }
 
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        if (ok) cameraUri?.let { analisarFoto(it) }
+    val cameraActivity = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        if (res.resultCode == Activity.RESULT_OK) {
+            res.data?.getStringExtra(JarvisCameraActivity.EXTRA_PATH)?.let { path ->
+                analisarFoto(Uri.fromFile(java.io.File(path)))
+            }
+        }
     }
 
-    fun abrirCamera(pergunta: String?) {
+    val camPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            cameraActivity.launch(
+                Intent(ctx, JarvisCameraActivity::class.java).putExtra(JarvisCameraActivity.EXTRA_FACING, pendingFacing)
+            )
+        } else {
+            messages = messages + ChatMessage("model", "Preciso da permissão da câmera para enxergar, senhor — toque no ícone de foto de novo quando liberar.")
+        }
+    }
+
+    /** Abre a câmera NATIVA do JARVIS. cameraChoice: "frontal" | "traseira" | null (padrão traseira) */
+    fun abrirCamera(pergunta: String?, cameraChoice: String? = null) {
         visaoPergunta = pergunta
-        val dir = java.io.File(ctx.cacheDir, "visao").apply { mkdirs() }
-        val foto = java.io.File(dir, "jarvis_olho.jpg")
-        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "com.andre.jarvisultra.fileprovider", foto)
-        cameraUri = uri
-        camera.launch(uri)
+        pendingFacing = if (cameraChoice == "frontal")
+            androidx.camera.core.CameraSelector.LENS_FACING_FRONT
+        else androidx.camera.core.CameraSelector.LENS_FACING_BACK
+        if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            cameraActivity.launch(
+                Intent(ctx, JarvisCameraActivity::class.java).putExtra(JarvisCameraActivity.EXTRA_FACING, pendingFacing)
+            )
+        } else camPerm.launch(android.Manifest.permission.CAMERA)
     }
 
     // quando o GEMINI chamar a tool ver_camera, a câmera abre por aqui
     DisposableEffect(Unit) {
-        JarvisVisao.onCaptureRequest = { pergunta -> mainHandler.post { abrirCamera(pergunta) } }
+        JarvisVisao.onCaptureRequest = { pergunta, camera -> mainHandler.post { abrirCamera(pergunta, camera) } }
         onDispose { JarvisVisao.onCaptureRequest = null }
     }
 
