@@ -78,6 +78,24 @@ fun ArcReactorHud(
     val redDim = CyanDim
     val glow = red.copy(alpha = 0.55f + 0.35f * breathe)
 
+    // Paints criados UMA vez e reciclados por frame (sem GC churn)
+    val paintLbl = remember { android.graphics.Paint().apply {
+        isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.MONOSPACE; letterSpacing = 0.12f
+    } }
+    val paintBig = remember { android.graphics.Paint().apply {
+        isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+    } }
+    val paintSmall = remember { android.graphics.Paint().apply {
+        isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.MONOSPACE; letterSpacing = 0.15f
+    } }
+    val paintPct = remember { android.graphics.Paint().apply {
+        isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.MONOSPACE
+    } }
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -178,14 +196,8 @@ fun ArcReactorHud(
 
         // ---- rótulos curtos ao redor (capsule labels) ----
         val labels = listOf("VOZ", "GPS", "MEM", "REDE")
-        val paintLbl = android.graphics.Paint().apply {
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            textSize = r * 0.075f
-            typeface = android.graphics.Typeface.MONOSPACE
-            color = red.copy(alpha = 0.85f).toArgbInt()
-            letterSpacing = 0.12f
-        }
+        paintLbl.textSize = r * 0.075f
+        paintLbl.color = red.copy(alpha = 0.85f).toArgbInt()
         labels.forEachIndexed { i, lbl ->
             val a = (45f + i * 90f) * (PI.toFloat() / 180f)
             val lx = cx + r * 0.68f * cos(a)
@@ -194,37 +206,21 @@ fun ArcReactorHud(
         }
 
         // ---- número central (bateria) ----
-        val bigPaint = android.graphics.Paint().apply {
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            textSize = r * 0.46f
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
-            color = red.copy(alpha = 0.95f).toArgbInt()
-        }
+        paintBig.textSize = r * 0.46f
+        paintBig.color = red.copy(alpha = 0.95f).toArgbInt()
         val centerLabel = if (isThinking) "···" else pct.toString()
         drawContext.canvas.nativeCanvas.drawText(
-            centerLabel, cx, cy + r * 0.17f, bigPaint
+            centerLabel, cx, cy + r * 0.17f, paintBig
         )
-        val smallPaint = android.graphics.Paint().apply {
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            textSize = r * 0.10f
-            typeface = android.graphics.Typeface.MONOSPACE
-            color = redDim.copy(alpha = 0.9f).toArgbInt()
-            letterSpacing = 0.15f
-        }
+        paintSmall.textSize = r * 0.10f
+        paintSmall.color = redDim.copy(alpha = 0.9f).toArgbInt()
         drawContext.canvas.nativeCanvas.drawText(
-            "$horaTxt · $dataTxt", cx, cy + r * 0.34f, smallPaint
+            "$horaTxt · $dataTxt", cx, cy + r * 0.34f, paintSmall
         )
         if (!isThinking) {
-            val pctPaint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                textAlign = android.graphics.Paint.Align.CENTER
-                textSize = r * 0.09f
-                typeface = android.graphics.Typeface.MONOSPACE
-                color = redDim.copy(alpha = 0.75f).toArgbInt()
-            }
-            drawContext.canvas.nativeCanvas.drawText("BAT%", cx, cy - r * 0.08f, pctPaint)
+            paintPct.textSize = r * 0.09f
+            paintPct.color = redDim.copy(alpha = 0.75f).toArgbInt()
+            drawContext.canvas.nativeCanvas.drawText("BAT%", cx, cy - r * 0.08f, paintPct)
         }
 
         // ---- aura extra quando falando/escutando ----
