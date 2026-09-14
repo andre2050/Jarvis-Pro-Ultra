@@ -205,23 +205,52 @@ fun ArcReactorHud(
             drawContext.canvas.nativeCanvas.drawText(lbl, lx, ly, paintLbl)
         }
 
-        // ---- número central (bateria) ----
-        paintBig.textSize = r * 0.46f
-        paintBig.color = red.copy(alpha = 0.95f).toArgbInt()
-        val centerLabel = if (isThinking) "···" else pct.toString()
-        drawContext.canvas.nativeCanvas.drawText(
-            centerLabel, cx, cy + r * 0.17f, paintBig
-        )
-        paintSmall.textSize = r * 0.10f
-        paintSmall.color = redDim.copy(alpha = 0.9f).toArgbInt()
-        drawContext.canvas.nativeCanvas.drawText(
-            "$horaTxt · $dataTxt", cx, cy + r * 0.34f, paintSmall
-        )
-        if (!isThinking) {
-            paintPct.textSize = r * 0.09f
-            paintPct.color = redDim.copy(alpha = 0.75f).toArgbInt()
-            drawContext.canvas.nativeCanvas.drawText("BAT%", cx, cy - r * 0.08f, paintPct)
+        // ---- núcleo: glifo triangular estilo Stark (pulsa com o breathe) ----
+        val s = r * 0.40f * (0.97f + 0.03f * breathe)
+        fun vert(angDeg: Float): Offset {
+            val a = angDeg * (PI.toFloat() / 180f)
+            return Offset(cx + s * cos(a), cy + s * sin(a))
         }
+        val v0 = vert(-90f); val v1 = vert(30f); val v2 = vert(150f)
+        val triPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(v0.x, v0.y); lineTo(v1.x, v1.y); lineTo(v2.x, v2.y); close()
+        }
+        drawPath(
+            triPath,
+            brush = Brush.radialGradient(
+                colors = listOf(red.copy(alpha = 0.30f + 0.12f * breathe), red.copy(alpha = 0.06f)),
+                center = Offset(cx, cy), radius = s
+            )
+        )
+        drawPath(triPath, red.copy(alpha = 0.9f), style = Stroke(width = 2.4f))
+        // triângulo interno, levemente menor, girando bem devagar
+        rotate(degrees = slowSpin * 0.08f, pivot = Offset(cx, cy)) {
+            fun vertIn(angDeg: Float): Offset {
+                val a = angDeg * (PI.toFloat() / 180f)
+                return Offset(cx + s * 0.58f * cos(a), cy + s * 0.58f * sin(a))
+            }
+            val i0 = vertIn(-90f); val i1 = vertIn(30f); val i2 = vertIn(150f)
+            val innerPath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(i0.x, i0.y); lineTo(i1.x, i1.y); lineTo(i2.x, i2.y); close()
+            }
+            drawPath(innerPath, redDim.copy(alpha = 0.7f), style = Stroke(width = 1.4f))
+        }
+        drawCircle(red.copy(alpha = 0.85f + 0.15f * breathe), radius = 3.5f, center = Offset(cx, cy))
+
+        if (isThinking) {
+            paintBig.textSize = r * 0.13f
+            paintBig.color = red.copy(alpha = 0.95f).toArgbInt()
+            drawContext.canvas.nativeCanvas.drawText("···", cx, cy + s * 0.9f, paintBig)
+        } else {
+            paintPct.textSize = r * 0.085f
+            paintPct.color = redDim.copy(alpha = 0.85f).toArgbInt()
+            drawContext.canvas.nativeCanvas.drawText("BAT $pct%", cx, cy + s + r * 0.16f, paintPct)
+        }
+        paintSmall.textSize = r * 0.095f
+        paintSmall.color = red.copy(alpha = 0.9f).toArgbInt()
+        drawContext.canvas.nativeCanvas.drawText(
+            "$horaTxt · $dataTxt", cx, cy + s + r * 0.30f, paintSmall
+        )
 
         // ---- aura extra quando falando/escutando ----
         if (isSpeaking || isListening) {

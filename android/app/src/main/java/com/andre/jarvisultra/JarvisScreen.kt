@@ -171,7 +171,7 @@ fun JarvisApp() {
 
     Box(
         Modifier.fillMaxSize().background(
-            Brush.verticalGradient(listOf(Color(0xFF150404), Color(0xFF0A0303), Color(0xFF020000)))
+            Brush.verticalGradient(listOf(Color(0xFF071522), Color(0xFF040B14), Color(0xFF01050A)))
         )
     ) {
         Box(
@@ -186,16 +186,54 @@ fun JarvisApp() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ArcReactorHud(
-                modifier = Modifier
-                    .padding(top = 8.dp, bottom = 4.dp)
-                    .size(190.dp),
-                ctx = ctx,
-                isSpeaking = isSpeaking,
-                isThinking = isThinking,
-                isListening = (handsFree == "on")
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "JARVIS OS · v" + JarvisBrain.APP_VERSION,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                color = Cyan.copy(alpha = 0.75f),
+                letterSpacing = 1.5.sp
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("SENHOR", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = CyanDim, letterSpacing = 1.sp)
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .size(22.dp)
+                        .background(Cyan.copy(alpha = 0.14f), CircleShape)
+                        .border(1.dp, Cyan.copy(alpha = 0.6f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("A", fontSize = 11.sp, color = Cyan, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    StatChip(label = "MEM", value = memPct(ctx) + "%")
+                    Spacer(Modifier.height(8.dp))
+                    StatChip(label = "VOZ", value = if (handsFree == "on") "ON" else "OFF")
+                }
+                ArcReactorHud(
+                    modifier = Modifier
+                        .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
+                        .size(190.dp),
+                    ctx = ctx,
+                    isSpeaking = isSpeaking,
+                    isThinking = isThinking,
+                    isListening = (handsFree == "on")
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    StatChip(label = "NET", value = netStatus(ctx))
+                    Spacer(Modifier.height(8.dp))
+                    StatChip(label = "GPS", value = if (hasLocationPermission(ctx)) "ON" else "OFF")
+                }
+            }
             Row(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
                 IconButton(onClick = {
                     scope.launch {
@@ -211,6 +249,20 @@ fun JarvisApp() {
                     Icon(Icons.Default.Settings, contentDescription = "Configurações", tint = CyanDim)
                 }
             }
+        }
+        Row(
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.width(28.dp).height(1.dp).background(HoloLine))
+            Text(
+                "  J . A . R . V . I . S   P R O   U L T R A  ",
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                color = CyanDim,
+                letterSpacing = 1.sp
+            )
+            Box(Modifier.width(28.dp).height(1.dp).background(HoloLine))
         }
         Row(
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 10.dp),
@@ -271,7 +323,7 @@ fun JarvisApp() {
                         bottomEnd = 14.dp
                     )
                     Surface(
-                        color = if (isUser) Cyan.copy(alpha = 0.12f) else Color(0xF2190606),
+                        color = if (isUser) Cyan.copy(alpha = 0.12f) else Color(0xF2071522),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         shape = shape,
                         modifier = Modifier
@@ -297,7 +349,7 @@ fun JarvisApp() {
         }
 
         Surface(
-            color = Color(0xD9130404),
+            color = Color(0xD90A1826),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 6.dp)
@@ -366,14 +418,14 @@ fun JarvisApp() {
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp, color = Color(0xFF8A6060)) },
+                    placeholder = { Text("Mande uma ordem, senhor…", fontSize = 14.sp, color = Color(0xFF5A7A8A)) },
                     singleLine = true,
                     shape = RoundedCornerShape(18.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Cyan,
                         unfocusedBorderColor = HoloLine,
-                        focusedTextColor = Color(0xFFF3E5E0),
-                        unfocusedTextColor = Color(0xFFF3E5E0),
+                        focusedTextColor = Color(0xFFE2F3FA),
+                        unfocusedTextColor = Color(0xFFE2F3FA),
                         cursorColor = Cyan
                     )
                 )
