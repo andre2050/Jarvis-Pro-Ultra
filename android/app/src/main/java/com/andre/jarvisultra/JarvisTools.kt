@@ -81,6 +81,8 @@ object JarvisTools {
         for (i in 0 until phone.length()) r.put(phone.get(i))
         val percepcao = JarvisPercepcao.declarations()
         for (i in 0 until percepcao.length()) r.put(percepcao.get(i))
+        val visao = JarvisVisao.declarations()
+        for (i in 0 until visao.length()) r.put(visao.get(i))
         return r
     }
 
@@ -92,7 +94,8 @@ object JarvisTools {
             "status_dispositivo" -> statusDispositivo(ctx)
             "piada" -> piadaAleatoria()
             "lembrar_fato" -> lembrarFato(ctx, args.getString("fato"))
-            else -> JarvisPercepcao.execute(ctx, name, args)
+            else -> JarvisVisao.execute(ctx, name, args)
+                ?: JarvisPercepcao.execute(ctx, name, args)
                 ?: JarvisPhoneTools.execute(ctx, name, args)
                 ?: "tool desconhecida: $name"
         }

@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "4.4.0"
+    const val APP_VERSION = "4.5.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -24,6 +24,7 @@ object JarvisBrain {
         - Você tem memória de longo prazo: quando o usuário pedir para lembrar ou guardar algo, chame a tool lembrar_fato.
         - Você controla o celular do senhor: ligações (ligar_para), WhatsApp (abre o chat com a mensagem pronta — o toque final de envio é dele, nunca prometa envio automático), SMS, leitura de notificações e SMS, alarmes, lanterna e abrir apps. Prefira sempre as tools quando ele pedir ações do telefone.
         - Também tem: definir_timer, pesquisar_web e listar_memorias. E o modo mãos-livres: o senhor fala 'Jarvis' e depois o comando por voz, tudo offline.
+        - VISÃO COMPUTACIONAL (v4.5): quando o senhor pedir para ver/olhar algo pela câmera, ler texto físico (etiqueta, conta, papel) ou identificar um objeto, chame ver_camera — a foto chegará em seguida na conversa como imagem; analise-a com precisão: descreva objetos e contexto, transcreva textos por completo e responda o que foi pedido.
         - PERCEPÇÃO TOTAL (v4.0): clima (tempo real via GPS), onde_estou (bairro/cidade via GPS), navegar_para (abre o mapa com rota), tocar_musica (YouTube/Spotify) e controlar_volume.
         - No fim deste prompt vem o CONTEXTO VIVO do aparelho (hora, bateria, volume) — você já sabe isso sem precisar de tools; cite quando for útil (ex: 'bateria em 12%, senhor, sugiro o carregador').
         - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo, ler_notificacoes e listar_memorias — um resumo curto e espirituoso.
@@ -36,19 +37,28 @@ object JarvisBrain {
      * Processa uma mensagem do usuário: roda o loop de function calling e devolve
      * a resposta final + o histórico atualizado (incluindo as rodadas de tool).
      */
-    suspend fun process(ctx: Context, apiKey: String, history: JSONArray, userMessage: String): TurnResult {
+    suspend fun process(ctx: Context, apiKey: String, history: JSONArray, userMessage: String,
+                           imageB64: String? = null, imageMime: String = "image/jpeg"): TurnResult {
         val contents = history
+        val userParts = JSONArray()
+        if (imageB64 != null) {
+            userParts.put(JSONObject().put("inline_data", JSONObject()
+                .put("mime_type", imageMime).put("data", imageB64)))
+        }
+        userParts.put(JSONObject().put("text", userMessage))
         contents.put(JSONObject()
             .put("role", "user")
-            .put("parts", JSONArray().put(JSONObject().put("text", userMessage))))
+            .put("parts", userParts))
 
         JarvisMemory.ensure(ctx)
         JarvisMemory.logInteraction(ctx, "chat", userMessage.take(80))
 
         val mems = JarvisMemory.search(ctx, userMessage)
         val basePrompt = systemPrompt() + "\n" + JarvisPercepcao.contextoDoAparelho(ctx)
-        val prompt = if (mems.isEmpty()) basePrompt else
-            basePrompt + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
+        val visaoNota = if (imageB64 != null) "\nVISÃO: o senhor acaba de enviar uma FOTO pela câmera — analise a imagem recebida (descreva, transcreva textos, responda a pergunta) antes de qualquer outra coisa." else ""
+        val prompt = (if (mems.isEmpty()) basePrompt + visaoNota else
+            basePrompt + visaoNota + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
+        )
 
         val toolsUsed = mutableListOf<String>()
 

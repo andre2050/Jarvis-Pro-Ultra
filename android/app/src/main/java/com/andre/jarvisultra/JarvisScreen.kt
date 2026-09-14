@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -102,6 +103,9 @@ fun JarvisApp() {
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
     var handsFree by remember { mutableStateOf("off") }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
+    // --- VISÃO COMPUTACIONAL v4.5.0 ---
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var visaoPergunta by remember { mutableStateOf<String?>(null) }
     val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
 
     val voice = remember {
@@ -141,6 +145,57 @@ fun JarvisApp() {
             val text = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!text.isNullOrBlank()) input = text
         }
+    }
+
+    // --- VISÃO: análise da foto capturada (multimodal no Gemini) ---
+    fun analisarFoto(uri: Uri) {
+        if (isThinking) return
+        if (!apiKeySaved) {
+            messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — sem ela eu sou cego. Toque na engrenagem e cole a chave.")
+            return
+        }
+        val pergunta = (visaoPergunta ?: "O que você está vendo, JARVIS? Descreva de forma curta e útil.").trim()
+        messages = messages + ChatMessage("user", "📷 " + pergunta) + ChatMessage("model", "…")
+        isThinking = true
+        scope.launch {
+            val key = SettingsStore.getApiKey(ctx)
+            val enc = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                JarvisVisao.codificarParaGemini(ctx, uri)
+            }
+            val result = if (enc == null) {
+                JarvisBrain.TurnResult("Não consegui processar a foto, senhor — tente de novo, de preferência com mais luz.", history, emptyList())
+            } else {
+                try {
+                    JarvisBrain.process(ctx, key, history, pergunta, imageB64 = enc.first, imageMime = enc.second)
+                } catch (e: Exception) {
+                    JarvisBrain.TurnResult(e.message ?: "erro inesperado", history, emptyList())
+                }
+            }
+            isThinking = false
+            val reply = result.reply.ifBlank { "Às ordens, senhor." }
+            messages = messages.dropLast(1) + ChatMessage("model", reply)
+            if (!reply.startsWith("⚠️")) voice.speak(reply)
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok) cameraUri?.let { analisarFoto(it) }
+    }
+
+    fun abrirCamera(pergunta: String?) {
+        visaoPergunta = pergunta
+        val dir = java.io.File(ctx.cacheDir, "visao").apply { mkdirs() }
+        val foto = java.io.File(dir, "jarvis_olho.jpg")
+        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "com.andre.jarvisultra.fileprovider", foto)
+        cameraUri = uri
+        camera.launch(uri)
+    }
+
+    // quando o GEMINI chamar a tool ver_camera, a câmera abre por aqui
+    DisposableEffect(Unit) {
+        JarvisVisao.onCaptureRequest = { pergunta -> mainHandler.post { abrirCamera(pergunta) } }
+        onDispose { JarvisVisao.onCaptureRequest = null }
     }
 
     fun send(forced: String? = null) {
@@ -401,6 +456,10 @@ fun JarvisApp() {
                 }) {
                     Icon(Icons.Default.Phone, contentDescription = "Mãos livres",
                         tint = if (handsFree == "on") Cyan else CyanDim)
+                }
+
+                IconButton(onClick = { abrirCamera(null) }) {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = "Visão — abrir câmera", tint = Cyan)
                 }
 
                 IconButton(onClick = {
