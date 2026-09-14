@@ -291,8 +291,9 @@ fun JarvisApp() {
             }
             Row(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
                 IconButton(onClick = {
+                    updateInfo = "Verificando atualizações no GitHub, senhor…"
                     scope.launch {
-                        updateInfo = try { Updater.check() } catch (e: Exception) { e.message }
+                        updateInfo = try { Updater.check() } catch (e: Exception) { e.message ?: "erro de conexão ao verificar atualização" }
                     }
                 }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Verificar atualização", tint = CyanDim)
@@ -577,8 +578,9 @@ fun JarvisApp() {
                     Text("Verifico novas versões direto no GitHub — instala por cima sem perder nada.", fontSize = 12.sp)
                     Row {
                         TextButton(onClick = {
+                            updateInfo = "Verificando atualizações no GitHub, senhor…"
                             scope.launch {
-                                updateInfo = try { Updater.check() } catch (e: Exception) { e.message }
+                                updateInfo = try { Updater.check() } catch (e: Exception) { e.message ?: "erro de conexão ao verificar atualização" }
                             }
                         }) { Text("Verificar agora", fontSize = 12.sp) }
                         TextButton(onClick = {

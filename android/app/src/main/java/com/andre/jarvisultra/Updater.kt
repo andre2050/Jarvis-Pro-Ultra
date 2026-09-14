@@ -20,12 +20,14 @@ object Updater {
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)   // nunca trava: no máximo 25s e devolve erro
+        .dns(FallbackDns)                    // mesmo DNS resiliente do GeminiClient
         .build()
 
     suspend fun check(): String = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(MANIFEST_URL).header("User-Agent", "JarvisProUltra-Android/${JarvisBrain.APP_VERSION}").build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return@withContext "Não consegui consultar o servidor de atualização (HTTP ${resp.code})."
+            if (!resp.isSuccessful) return@withContext "Não consegui consultar o servidor de atualização (HTTP ${resp.code}), senhor. Abra a página de releases pelo botão abaixo."
             val man = JSONObject(resp.body?.string() ?: "{}")
             val latest = man.optString("latest_version", "")
             if (latest.isEmpty()) return@withContext "Servidor de atualização respondeu sem versão."
