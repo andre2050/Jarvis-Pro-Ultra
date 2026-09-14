@@ -6,7 +6,7 @@
 
 **O assistente pessoal com IA que fala português, escuta offline e controla seu aparelho inteiro.**
 
-`Android 4.5.0 · Olhos de Ferro` · `Desktop 5.0.2 · Ollama offline` · `Core Python`
+`Android 4.6.0 · Ambos os Olhos` · `Desktop 5.0.2 · Ollama offline` · `Core Python`
 
 [![Última release](https://img.shields.io/github/v/release/andre2050/Jarvis-Pro-Ultra?style=flat-square&color=2FD8FF&label=release)](https://github.com/andre2050/Jarvis-Pro-Ultra/releases/latest)
 [![Releases](https://img.shields.io/github/downloads/andre2050/Jarvis-Pro-Ultra/total?style=flat-square&label=downloads)](https://github.com/andre2050/Jarvis-Pro-Ultra/releases)
@@ -17,7 +17,16 @@
 
 ---
 
-## 🆕 v4.5.0 — Olhos de Ferro (Visão Computacional)
+## 🆕 v4.6.0 — Ambos os Olhos (Câmeras Frontal e Traseira)
+
+O JARVIS agora tem câmera **nativa própria** (CameraX) — com preview em tela cheia estilo HUD, obturador e **botão de alternar entre frontal e traseira**:
+
+- 📷 **Câmera nativa in-app** — não depende mais da câmera do sistema
+- 🔄 **Frontal ↔ traseira** — alterne a qualquer momento dentro da câmera do JARVIS
+- 🗣️ **Por voz, ele escolhe o olho**: _"Jarvis, o que você vê?"_ → traseira · _"Jarvis, se olhe"_ / _"olhe pra mim"_ → **frontal** (tool `ver_camera` com parâmetro `camera`)
+- 🧠 A foto segue direto pro Gemini multimodal e ele responde falando
+
+## v4.5.0 — Olhos de Ferro
 
 O JARVIS agora **enxerga**:
 
@@ -55,7 +64,7 @@ Baixe o APK direto da [última release](https://github.com/andre2050/Jarvis-Pro-
 | 🗣️ **Voz neural** | Reconhecimento **100% offline** (Vosk pt-BR, embutido no APK), síntese de voz nativa e modo mãos-livres que responde à palavra "Jarvis" |
 | 🤖 **Cérebro Gemini** | Conversa natural com histórico, contexto do aparelho injetado a cada turno (hora, bateria, carregando, volume, rede, localização) — ele *sabe* sem você contar |
 | 📞 **Controle total** | Ligações (com busca em contatos), WhatsApp com texto pré-preenchido, envio/leitura de SMS, leitura de notificações (WhatsApp e SMS via `NotificationListenerService`), alarmes, lanterna, abrir apps, timer, busca na web |
-| 👁️ **Visão** | Câmera + multimodal: descreve cenas, lê textos físicos (etiquetas, contas), identifica objetos — por botão ou por voz |
+| 👁️ **Visão** | Câmera NATIVA frontal+traseira com alternância + multimodal Gemini: descreve cenas, lê textos físicos, identifica objetos — por botão ou por voz (ele escolhe o olho certo) |
 | 🌍 **Percepção** | Clima em tempo real via GPS (Open-Meteo, sem API key), "onde estou" com geocodificação reversa (OSM), navegação pro destino (Google Maps), tocar música (YouTube/Spotify), controle de volume |
 | 💾 **Memória** | Lembra fatos declarados ("lembra que…"), consulta memórias antigas e mantém contexto entre turnos |
 | 🔄 **Auto-update** | Verifica versões novas direto do GitHub e instala por cima — manifesto assinado com Ed25519 |
@@ -78,6 +87,7 @@ android/app/src/main/java/com/andre/jarvisultra/
 ├── JarvisPhoneTools.kt        # Tools de controle: ligar, WhatsApp, SMS, lanterna…
 ├── JarvisPercepcao.kt         # Tools de percepção: clima, GPS, navegação, música
 ├── JarvisVisao.kt             # Visão computacional: tool ver_camera + encode multimodal
+├── JarvisCameraActivity.kt    # Câmera nativa CameraX: frontal/traseira, obturador e HUD próprio
 ├── JarvisNotificationListener.kt + JarvisNotificationStore.kt  # Notificações
 ├── JarvisMemory.kt           # Memória persistente de fatos
 ├── SettingsStore.kt          # Chave de API guardada só no aparelho
@@ -113,7 +123,8 @@ Requisitos: JDK 17, Android SDK 34. Assinatura de release via `JARVIS_KEYSTORE` 
 
 | Versão | Marco |
 |---|---|
-| **4.5.0** | 👁️ Visão computacional: câmera + multimodal, vê descreve e lê o mundo |
+| **4.6.0** | 👁️👁️ Ambos os Olhos: câmera nativa frontal+traseira, alternância e voz escolhe o olho |
+| 4.5.0 |
 | 4.4.0 | 🎬 Interface JARVIS OS: paleta Stark, núcleo triangular, painéis de dados reais |
 | 4.3.x | Reator de arco em Canvas: dial, chevrons, blooms — depois otimizado sem GC churn |
 | 4.2.0 | Painel de Configurações: microfone, atualização, sobre |
