@@ -335,10 +335,16 @@ class PainelConfig(tk.Toplevel):
 
     def _atualiza_status_voz(self):
         ok, motivo = self.app.voz.estado()
-        if ok:
+        if ok and motivo == "ok":
             self.lbl_voz_detalhe.config(text="✓ Voz do JARVIS funcionando (pyttsx3)",
                                         fg="#7dc98f")
             self.btn_voz_instalar.pack_forget()
+        elif ok:
+            # v5.1.9: falando pela voz nativa do Windows — funciona, mas dá pra melhorar
+            self.lbl_voz_detalhe.config(
+                text=f"✓ Voz funcionando — {motivo}",
+                fg="#e0c48f")
+            self.btn_voz_instalar.pack(fill=tk.X, padx=10, pady=(0, 10), anchor="w")
         else:
             self.lbl_voz_detalhe.config(text=f"✗ O JARVIS NÃO ESTÁ CONSEGUINDO FALAR — {motivo}",
                                         fg="#ff9a8f")
