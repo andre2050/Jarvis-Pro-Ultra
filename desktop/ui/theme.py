@@ -4,6 +4,7 @@ Temas:
   - classico  · azul holográfico do JARVIS original (Homem de Ferro)
   - vermelho  · Reator de Arco Vermelho (o clássico das versões Android)
   - gold      · dourado Stark (MK III)
+  - radar     · holograma circular teal com sweep de radar (v5.1.0)
 """
 TEMAS = {
     "classico": {
@@ -23,6 +24,15 @@ TEMAS = {
         "entrada_bg": "#1d1214", "user_bg": "#33100c", "chat_bg": "#0d0708",
         "chat_fundo": "#0a0507", "fg_dim": "#ffe4de", "txt_fraco": "#9c8a86",
         "txt_claro": "#f2e6e4", "erro_bg": "#2a0d0d", "erro_fg": "#ff9a8f",
+    },
+    "radar": {
+        "principal": "#00e5c7", "vivo": "#5ffbe9", "dim": "#0a7a6a",
+        "escuro": "#063b34", "fundo": "#031012",
+        "glows": ["#03201d", "#063b34", "#0a5249", "#0a7a6a", "#10b39e"],
+        "janela_bg": "#020a0c", "painel_bg": "#051014", "painel2": "#082026",
+        "entrada_bg": "#0a2830", "user_bg": "#0c3f44", "chat_bg": "#051014",
+        "chat_fundo": "#030d10", "fg_dim": "#d8fff7", "txt_fraco": "#7aa89f",
+        "txt_claro": "#eafffb", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
     },
     "gold": {
         "principal": "#ffb830", "vivo": "#ffd35e", "dim": "#a1730f",

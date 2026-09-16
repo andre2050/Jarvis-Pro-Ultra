@@ -6,6 +6,6 @@ Executa com:  python main.py
 """
 
 APP_NAME = "J.A.R.V.I.S — Pro Ultra Desktop"
-__version__ = "5.0.2"
+__version__ = "5.1.0"
 OWNER = "André Luiz Lima Menezes"  # dono do projeto
 GITHUB_REPO = "andre2050/Jarvis-Pro-Ultra"

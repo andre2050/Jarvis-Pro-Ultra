@@ -240,6 +240,9 @@ class JarvisApp(tk.Tk):
         if self.cfg.get("cerebro") == "ollama":
             self.chat.add("sistema", f"🧠 Cérebro OFFLINE: {self.cfg.get('ollama_model')} via Ollama — "
                                      "nada sai deste computador.")
+        if self.cfg.get("hermes_ativo"):
+            self.chat.add("sistema", "🛰 HERMES em posição — pedidos complexos serão "
+                                    "orquestrados em planos de até 8 passos.")
 
         # ---- briefing do dia (primeira inicialização de hoje) ----
         hoje = datetime.now().strftime("%Y-%m-%d")

@@ -168,11 +168,36 @@ class PainelConfig(tk.Toplevel):
         self.var_tema = tk.StringVar(value=cfg.get("tema", "classico"))
         for rot, desc in (("classico", "Azul holográfico (J.A.R.V.I.S original)"),
                           ("vermelho", "Reator de Arco Vermelho (v4.x)"),
-                          ("gold", "Dourado Stark MK III")):
+                          ("gold", "Dourado Stark MK III"),
+                          ("radar", "Holograma circular teal com sweep de radar (v5.1.0)")):
             tk.Radiobutton(zona_t, text=desc, variable=self.var_tema, value=rot,
                            bg="#171012", fg="#f2e6e4", selectcolor="#0d0708",
                            activebackground="#171012", font=("Segoe UI", 9),
                            anchor="w").pack(fill=tk.X, padx=10, anchor="w")
+
+        # ---------- HERMES (agente orquestrador) ----------
+        self._secao("🛰 HERMES — AGENTE ORQUESTRADOR (v5.1.0)")
+        zona_h = tk.Frame(self, bg="#171012")
+        zona_h.pack(fill=tk.X, padx=24)
+        tk.Label(zona_h, text=(
+            "Ligado, o HERMES planeja antes de responder: pede à rede neural um plano\n"
+            "de até 8 passos, executa as tools um a um e sintetiza a resposta final.\n"
+            "Ideal para pedidos complexos; para conversa simples ele responde direto."),
+            fg="#f2e6e4", bg="#171012", font=("Segoe UI", 9),
+            justify=tk.LEFT).pack(anchor="w", padx=10, pady=(6, 4))
+        self.var_hermes = tk.BooleanVar(value=bool(cfg.get("hermes_ativo")))
+        tk.Checkbutton(zona_h, text="Ativar modo orquestrador (aplica na hora)",
+                       variable=self.var_hermes, bg="#171012", fg="#f2e6e4",
+                       selectcolor="#0d0708", activebackground="#171012",
+                       font=("Segoe UI", 9, "bold"), anchor="w",
+                       command=self._alterna_hermes).pack(fill=tk.X, padx=10, anchor="w")
+        self.lbl_hermes = tk.Label(zona_h, text="HERMES em espera.",
+                                   fg="#9c8a86", bg="#171012", font=("Consolas", 8),
+                                   justify=tk.LEFT, wraplength=470)
+        self.lbl_hermes.pack(anchor="w", padx=10, pady=(4, 8))
+        tk.Button(zona_h, text="Ver último plano executado", bg="#0d0708",
+                  fg="#ff5a4d", bd=0, font=("Consolas", 8, "bold"), cursor="hand2",
+                  command=self._mostra_plano_hermes).pack(anchor="w", padx=10, pady=(0, 8))
 
         # ---------- SOBRE ----------
         self._secao("ℹ SOBRE")
@@ -190,6 +215,16 @@ class PainelConfig(tk.Toplevel):
         tk.Button(self, text="Concluir", command=self._concluir, bg="#a1160f",
                   fg="#ffe4de", bd=0, font=("Segoe UI", 10, "bold"), cursor="hand2",
                   padx=18, pady=6).pack(pady=16)
+
+    def _alterna_hermes(self):
+        self.app.cfg["hermes_ativo"] = bool(self.var_hermes.get())
+        config.save(self.app.cfg)
+        self._avalia("✓ HERMES " + ("ativado, senhor." if self.var_hermes.get()
+                                    else "desativado."), "#a9ff9c" if self.var_hermes.get() else "#ff9a8f")
+
+    def _mostra_plano_hermes(self):
+        from core import hermes
+        self.lbl_hermes.config(text=hermes.ultimo_relatorio())
 
     def _secao(self, txt: str):
         tk.Label(self, text=txt, bg="#0d0708", fg="#ff5a4d",

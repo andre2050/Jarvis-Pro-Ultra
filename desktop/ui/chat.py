@@ -25,7 +25,6 @@ class ChatPanel(tk.Frame):
         barra.pack(side=tk.RIGHT, fill=tk.Y)
         self.texto.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        f_user = tkfont.Font(font=("Segoe UI", 10))
         f_hora = tkfont.Font(font=("Segoe UI", 8))
 
         self.texto.tag_configure("user", background=COR_USER, foreground=TXT_USER,
@@ -95,7 +94,7 @@ class ChatPanel(tk.Frame):
         self.esconder_digitando()
         self.texto.configure(state=tk.NORMAL)
         self._marcador_digitando = self.texto.index(tk.END + "-1c")
-        self.texto.insert(tk.END, f"J.A.R.V.I.S está pensando ···\n", "jarvis_hora")
+        self.texto.insert(tk.END, "J.A.R.V.I.S está pensando ···\n", "jarvis_hora")
         self.texto.see(tk.END)
         self.texto.configure(state=tk.DISABLED)
 

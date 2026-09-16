@@ -5,6 +5,11 @@ instrumento, blooms de luz pulsantes, anel de chevrons girando, grade
 radial no núcleo e leitura viva do computador (bateria/CPU, hora, data).
 Animações: respira (2,6s), gira devagar (22s — 6s no modo mãos-livres),
 gira rápido (14s — 0,9s pensando), com aura extra falando/ouvindo.
+
+v5.1.0: cores lidas AO VIVO do tema (trocar em ⚙ CONFIG recolore sem reiniciar)
+e o tema "radar" desenha o HOLOGRAMA CIRCULAR — anéis concêntricos, sweep
+giratório com rastros, blips que acendem quando o varredura passa e retículo
+central. Mesmos estados (pensando/ouvindo/falando) do reator.
 """
 import math
 import time
@@ -24,25 +29,19 @@ def _T(chave):
     return _tema.cor(chave)
 
 
-RED = _T("principal")        # constantes legais seguem apontando pro tema ativo
-RED_VIVO = _T("vivo")
-RED_DIM = _T("dim")
-RED_ESCURO = _T("escuro")
-FUNDO = _T("fundo")
-GLOWS = _tema.cores()["glows"]  # tons de glow: do mais fraco ao mais forte
-
 SEMANA = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
 
 
 def _cor_letra(flick: float) -> str:
-    """Interpola na paleta GLOWS conforme intensidade 0..1."""
-    idx = min(len(GLOWS) - 1, int(flick * len(GLOWS)))
-    return GLOWS[idx]
+    """Interpola na paleta de glows DO TEMA ATIVO conforme intensidade 0..1."""
+    glows = _tema.cores()["glows"]
+    idx = min(len(glows) - 1, int(flick * len(glows)))
+    return glows[idx]
 
 
 class ArcReactorHud(tk.Canvas):
     def __init__(self, master, size: int = 430, **kw):
-        super().__init__(master, width=size, height=size, bg=FUNDO,
+        super().__init__(master, width=size, height=size, bg=_T("fundo"),
                          highlightthickness=0, **kw)
         self.size = size
         self.thinking = False
@@ -76,11 +75,131 @@ class ArcReactorHud(tk.Canvas):
         r = min(w, h) * 0.46
         el = time.time() - self._t0
 
-        # ciclos (idênticos ao Kotlin: 2600ms respirando, 22s/6s spin, 14s/0.9s spin2)
+        # v5.1.0: tema "radar" desenha o holograma circular da foto
+        if _tema.atual() == "radar":
+            self._frame_radar(cx, cy, r, el)
+            self.after(40, self._frame)
+    def _frame_radar(self, cx, cy, r, el):
+        """HOLOGRAMA CIRCULAR (tema radar) — anéis, sweep giratório, blips."""
+        principal = _T("principal")
+        vivo = _T("vivo")
+        dim = _T("dim")
+        escuro = _T("escuro")
+        glows = _tema.cores()["glows"]
+
+        # varredura: gira devagar (14s), 6s ouvindo, 0,9s pensando
+        periodo = 0.9 if self.thinking else (6 if self.listening else 14)
+        sweep = (el / periodo) * 360
+        ang = math.radians(sweep)
+
+        # ---- cross-hair do retículo ----
+        self.create_line(cx - r * 0.90, cy, cx + r * 0.90, cy, fill=dim, width=1)
+        self.create_line(cx, cy - r * 0.90, cx, cy + r * 0.90, fill=dim, width=1)
+
+        # ---- anéis concêntricos (3) ----
+        for f in (0.30, 0.55, 0.80):
+            self.create_oval(cx - r * f, cy - r * f, cx + r * f, cy + r * f,
+                             outline=dim, width=1.4)
+
+        # ---- sweep com rastros (4 fatias de alpha decrescente) ----
+        bbox = (cx - r * 0.80, cy - r * 0.80, cx + r * 0.80, cy + r * 0.80)
+        for i, (larg, stipp) in enumerate(((90, "gray12"), (55, "gray25"),
+                                           (30, "gray50"), (12, "gray75"))):
+            self.create_arc(bbox, start=sweep - larg, extent=larg,
+                            style=tk.CHORD, fill=principal, outline="",
+                            stipple=stipp)
+        self.create_line(cx, cy, cx + r * 0.80 * math.cos(ang),
+                          cy + r * 0.80 * math.sin(ang), fill=vivo, width=2)
+
+        # ---- blips: acendem quando o sweep passa, depois desvanecem ----
+        # posições fixas por índice (8 alvos "monitorados" pelo sistema)
+        for i in range(8):
+            b_ang = (i * 47 + 13) % 360
+            b_dist = 0.22 + (i % 3) * 0.19          # 0.22 / 0.41 / 0.60 do raio
+            a = math.radians(b_ang)
+            bx = cx + r * b_dist * math.cos(a)
+            by = cy + r * b_dist * math.sin(a)
+            atraso = (sweep - b_ang) % 360           # quanto o sweep passou dele
+            brilho = max(0.0, 1.0 - atraso / 360)    # 1.0 → 0.0 ao longo de 1 volta
+            if brilho <= 0.02:
+                continue
+            raio = 3 + 4 * brilho
+            idx = min(len(glows) - 1, int(brilho * len(glows)))
+            self.create_oval(bx - raio, by - raio, bx + raio, by + raio,
+                             fill=glows[len(glows) - 1 - idx] if brilho > 0.6 else dim,
+                             outline="")
+            if brilho > 0.25:
+                self.create_oval(bx - raio - 5, by - raio - 5, bx + raio + 5, by + raio + 5,
+                                 outline=glows[-2], width=1, stipple="gray25")
+
+        # ---- ticks externos (72 marcações, grandes a cada 6) ----
+        n_ticks = 72
+        r_out = r * 0.88
+        for i in range(n_ticks):
+            grande = i % 6 == 0
+            a = i * (360 / n_ticks) * math.pi / 180
+            tamanho = 12 if grande else 5
+            x1 = cx + (r_out - tamanho) * math.cos(a)
+            y1 = cy + (r_out - tamanho) * math.sin(a)
+            x2 = cx + r_out * math.cos(a)
+            y2 = cy + r_out * math.sin(a)
+            self.create_line(x1, y1, x2, y2, fill=principal if grande else dim,
+                             width=2 if grande else 1)
+
+        # ---- bezel duplo ----
+        self.create_oval(cx - r * 0.92, cy - r * 0.92, cx + r * 0.92, cy + r * 0.92,
+                         outline=dim, width=1.5)
+        self.create_oval(cx - r * 0.995, cy - r * 0.995, cx + r * 0.995, cy + r * 0.995,
+                         outline=escuro, width=1.5)
+
+        # ---- rótulos orbitais ----
+        labels = ["H E R M E S", "R E D E", "M E M", "V O Z"]
+        for i, lbl in enumerate(labels):
+            a = (-90 + i * 90) * math.pi / 180
+            lx, ly = cx + r * 0.67 * math.cos(a), cy + r * 0.67 * math.sin(a)
+            self.create_text(lx, ly, text=lbl, fill=vivo,
+                             font=("Consolas", max(9, int(r * 0.05))))
+
+        # ---- núcleo: disco de leitura (bateria/CPU) ----
+        self.create_oval(cx - r * 0.17, cy - r * 0.17, cx + r * 0.17, cy + r * 0.17,
+                         fill=glows[2], outline="")
+        if self.thinking:
+            centro = "···"
+        elif self._bat is not None:
+            centro = str(self._bat)
+        else:
+            centro = f"{self._cpu:.0f}"
+        self.create_text(cx, cy, text=centro, fill=vivo,
+                         font=("Consolas", int(r * 0.13), "bold"))
+        rotulo = "BAT%" if self._bat is not None else "CPU%"
+        if not self.thinking:
+            self.create_text(cx, cy - r * 0.26, text=rotulo, fill=dim,
+                             font=("Consolas", max(8, int(r * 0.05))))
+
+        # ---- hora · data embaixo ----
+        import datetime as _dt
+        agora = _dt.datetime.now()
+        self.create_text(cx, cy + r * 0.34,
+                         text=agora.strftime("%H:%M") + f" · {agora.day} DE {SEMANA[agora.weekday()]}",
+                         fill=dim, font=("Consolas", max(9, int(r * 0.05))))
+
+        # ---- aura extra quando falando ou ouvindo ----
+        if self.speaking or self.listening:
+            raio = r * (0.88 + 0.02 * math.sin(el * 6))
+            self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
+                             outline=principal, width=2, stipple="gray50")
+
+        self.after(40, self._frame)  # ~25 fps
+
+    def _frame_arc(self, cx, cy, r, el):
+        """Reator de arco clássico — o dial circular das versões anteriores."""
+        principal = _T("principal")
+        vivo = _T("vivo")
+        dim = _T("dim")
+        escuro = _T("escuro")
         breathe = (el % 2.6) / 2.6
         slow_spin = (el / (6 if self.listening else 22)) * 360
         fast_spin = (el / (0.9 if self.thinking else 14)) * 360
-
         # ---- núcleo: disco com brilho por trás do número ----
         self.create_oval(cx - r * 0.62, cy - r * 0.62, cx + r * 0.62, cy + r * 0.62,
                          fill=_cor_letra(0.28 + 0.10 * breathe), outline="")
@@ -91,9 +210,9 @@ class ArcReactorHud(tk.Canvas):
             a = i * (360 / 16) * math.pi / 180 + rot
             x1, y1 = cx + r * 0.20 * math.cos(a), cy + r * 0.20 * math.sin(a)
             x2, y2 = cx + r * 0.40 * math.cos(a), cy + r * 0.40 * math.sin(a)
-            self.create_line(x1, y1, x2, y2, fill=RED_DIM, width=1.2)
+            self.create_line(x1, y1, x2, y2, fill=dim, width=1.2)
         self.create_oval(cx - r * 0.40, cy - r * 0.40, cx + r * 0.40, cy + r * 0.40,
-                         outline=RED_DIM, width=1.2)
+                         outline=dim, width=1.2)
 
         # ---- anel de chevrons (40 dashes triangulares) girando ----
         rot = math.radians(slow_spin)
@@ -103,7 +222,7 @@ class ArcReactorHud(tk.Canvas):
             a0 = i * (360 / n_chev) * math.pi / 180 + rot
             a1 = (i * (360 / n_chev) + (360 / n_chev) * 0.55) * math.pi / 180 + rot
             grande = i % 5 == 0
-            cor = RED if grande else RED_DIM
+            cor = principal if grande else dim
             self.create_line(cx + rr * math.cos(a0), cy + rr * math.sin(a0),
                              cx + rr * math.cos(a1), cy + rr * math.sin(a1),
                              fill=cor, width=3.5 if grande else 2)
@@ -119,14 +238,14 @@ class ArcReactorHud(tk.Canvas):
             x1, y1 = cx + (r_out - tamanho) * math.cos(a), cy + (r_out - tamanho) * math.sin(a)
             x2, y2 = cx + r_out * math.cos(a), cy + r_out * math.sin(a)
             self.create_line(x1, y1, x2, y2,
-                             fill=RED if grande else RED_DIM,
+                             fill=principal if grande else dim,
                              width=2 if grande else 1)
 
         # ---- bezel externo (anel duplo) ----
         self.create_oval(cx - r * 0.86, cy - r * 0.86, cx + r * 0.86, cy + r * 0.86,
-                         outline=RED_DIM, width=1.5)
+                         outline=dim, width=1.5)
         self.create_oval(cx - r * 0.995, cy - r * 0.995, cx + r * 0.995, cy + r * 0.995,
-                         outline=RED_ESCURO, width=1.5)
+                         outline=escuro, width=1.5)
 
         # ---- blooms de luz pulsantes (7, ritmos diferentes) ----
         n_blooms = 7
@@ -146,14 +265,14 @@ class ArcReactorHud(tk.Canvas):
             p1 = (bx + 9 * math.cos(ang), by + 9 * math.sin(ang))
             p2 = (bx - 9 * math.cos(ang), by - 9 * math.sin(ang))
             tip = (bx + 11 * math.cos(a), by + 11 * math.sin(a))
-            self.create_polygon(p1, tip, p2, fill=RED_DIM, outline="")
+            self.create_polygon(p1, tip, p2, fill=dim, outline="")
 
         # ---- rótulos do dial: VOZ, GPS, MEM, REDE ----
         labels = ["V O Z", "G P S", "M E M", "R E D E"]
         for i, lbl in enumerate(labels):
             a = (45 + i * 90) * math.pi / 180
             lx, ly = cx + r * 0.68 * math.cos(a), cy + r * 0.68 * math.sin(a)
-            self.create_text(lx, ly, text=lbl, fill=RED_VIVO,
+            self.create_text(lx, ly, text=lbl, fill=vivo,
                              font=("Consolas", max(9, int(r * 0.055))))
 
         # ---- número central (bateria; CPU em desktops sem bateria) ----
@@ -163,26 +282,25 @@ class ArcReactorHud(tk.Canvas):
             centro = str(self._bat)
         else:
             centro = f"{self._cpu:.0f}"
-        self.create_text(cx, cy + r * 0.17, text=centro, fill=RED_VIVO,
+        self.create_text(cx, cy + r * 0.17, text=centro, fill=vivo,
                          font=("Consolas", int(r * 0.42), "bold"))
 
         # ---- BAT% / CPU% e hora · data ----
         rotulo = "BAT%" if self._bat is not None else "CPU%"
         if not self.thinking:
-            self.create_text(cx, cy - r * 0.08, text=rotulo, fill=RED_DIM,
+            self.create_text(cx, cy - r * 0.08, text=rotulo, fill=dim,
                              font=("Consolas", max(9, int(r * 0.085))))
         import datetime as _dt
         agora = _dt.datetime.now()
         hora_txt = agora.strftime("%H:%M")
         data_txt = f"{agora.day} DE {SEMANA[agora.weekday()]}"
         self.create_text(cx, cy + r * 0.34, text=f"{hora_txt} · {data_txt}",
-                         fill=RED_DIM, font=("Consolas", max(9, int(r * 0.085))))
+                         fill=dim, font=("Consolas", max(9, int(r * 0.085))))
 
         # ---- aura extra quando falando ou ouvindo ----
         if self.speaking or self.listening:
-            pulso = 0.55 + 0.35 * math.sin(el * 6)
             raio = r * (0.46 + 0.03 * breathe)
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
-                             outline=RED, width=2, stipple="gray50")
+                             outline=principal, width=2, stipple="gray50")
 
         self.after(40, self._frame)  # ~25 fps

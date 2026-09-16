@@ -89,3 +89,24 @@ config/                  — helpers de SO + api_keys.json (formato Mark LIII)
 
 ---
 **André Luiz Lima Menezes** — [Jarvis-Pro-Ultra](https://github.com/andre2050/Jarvis-Pro-Ultra)
+
+---
+
+## v5.1.0 — HERMES + Holograma Radar
+
+### 🛰 Agente HERMES (orquestrador)
+Em ⚙ CONFIG → HERMES, ative o modo orquestrador. Ligado, o JARVIS planeja
+antes de agir: a rede neural (Gemini ou Ollama) gera um plano de até 8
+passos, o HERMES executa cada tool na ordem certa e sintetiza a resposta
+final. Conversa simples? Ele responde direto, sem plano. O painel mostra
+o último plano executado, passo a passo.
+
+### 🎨 Tema RADAR (holograma circular)
+Quarto tema do HUD: teal holográfico com sweep de radar girando, anéis
+concêntricos, blips que acendem quando a varredura passa, retículo e
+leituras de bateria/CPU no centro. ⚙ CONFIG → TEMA → "Holograma circular".
+Bônus: trocar de tema agora recolore tudo na hora, sem reiniciar.
+
+### 🧠 Rede neural
+O cérebro dual Gemini/Ollama agora também planeja (HERMES) — function
+calling nativo nas duas pontas, 100% offline quando no Ollama.

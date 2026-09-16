@@ -59,6 +59,7 @@ Regras:
 - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo e listar_memorias — um resumo curto e espirituoso.
 - Se não tiver a tool certa, responda o melhor que puder e sugira o que pode fazer.
 - Versão atual do sistema: {__version__} (edição desktop em Python).
+- O módulo HERMES pode estar orquestrando por cima de você: quando ele executa um plano, apenas componha a resposta final com o que ele trouxer.
 """.strip()
 
 
@@ -81,6 +82,14 @@ def process(cfg: dict, history: list, user_message: str) -> TurnResult:
     prompt = system_prompt() + "\n" + perception.contexto_do_computador()
     if mems:
         prompt += "\nMemórias de longo prazo sobre o senhor (use quando relevante):\n- " + "\n- ".join(mems)
+
+    # 🛰 HERMES (v5.1.0): modo orquestrador — planeja, executa e sintetiza.
+    # Se qualquer coisa falhar lá dentro, retorna None e o fluxo normal segue.
+    if cfg.get("hermes_ativo"):
+        from . import hermes
+        resultado = hermes.executar(cfg, history, prompt, user_message)
+        if resultado is not None:
+            return resultado
 
     if cfg.get("cerebro") == "ollama":
         return _process_ollama(cfg, history, prompt)
