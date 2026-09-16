@@ -465,6 +465,7 @@ class JarvisApp(tk.Tk):
         sync_api_keys(self.cfg)
         self.voz.config = self.cfg
         self.voz.enabled = bool(self.cfg.get("voz_ativa", True))
+        self.voz.reconfigurar()   # v5.1.8: troca de voz valer na hora, sem reiniciar
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if self.voz.enabled else 'OFF'}",
                             fg=self.cor("vivo") if self.voz.enabled else self.cor("txt_fraco"))
         self._atualiza_botao_wake()

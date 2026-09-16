@@ -22,8 +22,14 @@ class Voz:
         # status: "ok" | "sem_biblioteca" | "erro_engine" | "iniciando"
         self._status = "iniciando"
         self._erro = ""
+        self.vozes = []          # v5.1.8: vozes do sistema (preenchido pelo engine)
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+
+    def reconfigurar(self) -> None:
+        """Reaplica a config no engine em uso (voz escolhida, velocidade) —
+        atravessa a fila pra não mexer no engine fora da thread dele."""
+        self._fila.put("__reconfigurar__")
 
     def estado(self) -> tuple:
         """(pode_falar, motivo) — diagnóstico honesto pra UI avisar o usuário."""
@@ -81,6 +87,9 @@ class Voz:
                 except Exception as e:
                     self._status, self._erro = "erro_engine", str(e)
                     continue
+            if texto == "__reconfigurar__":
+                self._configurar(engine)
+                continue
             try:
                 engine.say(texto)
                 engine.runAndWait()
@@ -98,7 +107,23 @@ class Voz:
             fator = float(self.config.get("voz_velocidade", 0.85))
             engine.setProperty("rate", int(rate * fator))
             engine.setProperty("volume", float(self.config.get("voz_volume", 1.0)))
-            # prefere voz masculina pt-BR/en-GB quando houver
+            # v5.1.8: catálogo de vozes do sistema pra UI deixar o usuário escolher
+            try:
+                disponiveis = list(engine.getProperty("voices") or [])
+                self.vozes = [{"id": getattr(v, "id", str(i)),
+                               "nome": (v.name or f"voz {i+1}")}
+                              for i, v in enumerate(disponiveis)]
+            except Exception:
+                disponiveis = []
+                self.vozes = []
+            # v5.1.8: voz escolhida pelo usuário tem prioridade total
+            escolhida = (self.config.get("voz_id") or "").strip()
+            if escolhida:
+                for v in disponiveis:
+                    if getattr(v, "id", "") == escolhida:
+                        engine.setProperty("voice", escolhida)
+                        return
+            # sem escolha: prefere voz masculina pt-BR/en-GB quando houver
             preferidas = []
             for v in engine.getProperty("voices"):
                 nome = (v.name or "").lower()

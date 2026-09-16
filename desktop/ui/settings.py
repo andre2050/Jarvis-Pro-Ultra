@@ -121,6 +121,18 @@ class PainelConfig(tk.Toplevel):
             zona, text="⬇ Instalar voz (1 clique — pyttsx3)",
             command=self._instalar_voz, bg="#33100c", fg="#ff9a8f", bd=0,
             font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=4)
+        # v5.1.8: SELETOR DE VOZ — escolha qualquer voz instalada no Windows
+        linha_vozes = tk.Frame(zona, bg="#171012")
+        linha_vozes.pack(fill=tk.X, padx=10, pady=(2, 2))
+        self.cmb_voz = ttk.Combobox(linha_vozes, state="readonly", width=34,
+                                    font=("Segoe UI", 9))
+        self.cmb_voz.pack(side=tk.LEFT)
+        tk.Label(linha_vozes, text="← escolha a voz e ouça o teste",
+                 fg="#9c8a86", bg="#171012", font=("Segoe UI", 8)).pack(side=tk.LEFT, padx=8)
+        self._vozes = [{"id": "", "nome": "Automática (padrão do JARVIS)"}]
+        self.cmb_voz["values"] = [self._vozes[0]["nome"]]
+        self.cmb_voz.set(self._vozes[0]["nome"])
+        self.after(700, self._carregar_vozes)   # engine carrega as vozes em background
         self._atualiza_status_voz()
 
         # ---------- PAINEL DE MEMÓRIA ----------
@@ -293,8 +305,33 @@ class PainelConfig(tk.Toplevel):
                 self._avalia(f"✗ {msg[:70]}", "#ff9a8f")
 
     def _testar_voz(self):
+        self._aplicar_voz_escolhida()   # ouve o teste NA voz selecionada
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
         self.after(300, self._atualiza_status_voz)
+
+    def _carregar_vozes(self):
+        """preenche o combobox com as vozes que o Windows tem instaladas"""
+        try:
+            do_sistema = self.app.voz.vozes or []
+        except Exception:
+            do_sistema = []
+        self._vozes = [{"id": "", "nome": "Automática (padrão do JARVIS)"}] + list(do_sistema)
+        self.cmb_voz["values"] = [v["nome"] for v in self._vozes]
+        atual = (self.app.voz.config.get("voz_id") or "").strip()
+        sel = self._vozes[0]["nome"]
+        for v in self._vozes:
+            if v["id"] == atual:
+                sel = v["nome"]
+        self.cmb_voz.set(sel)
+
+    def _aplicar_voz_escolhida(self):
+        """salva a escolha no config em memória e reaplica no engine na hora"""
+        escolhida = ""
+        for v in getattr(self, "_vozes", []):
+            if v["nome"] == self.cmb_voz.get():
+                escolhida = v["id"]
+        self.app.voz.config["voz_id"] = escolhida
+        self.app.voz.reconfigurar()
 
     def _atualiza_status_voz(self):
         ok, motivo = self.app.voz.estado()
@@ -464,7 +501,14 @@ class PainelConfig(tk.Toplevel):
         cfg["cerebro"] = self.var_cerebro.get()
         cfg["ollama_model"] = self.cmb_modelo.get()
         cfg["tema"] = self.var_tema.get()
+        cfg["voz_id"] = self._id_voz_escolhida()
         config.save(cfg)
         sync_api_keys(cfg)
         self.app.recarregar_config()
         self.destroy()
+
+    def _id_voz_escolhida(self) -> str:
+        for v in getattr(self, "_vozes", []):
+            if v["nome"] == self.cmb_voz.get():
+                return v["id"]
+        return ""
