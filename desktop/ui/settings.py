@@ -144,6 +144,12 @@ class PainelConfig(tk.Toplevel):
         self.lbl_wake_instala = tk.Label(linha_w, text="", fg="#9c8a86", bg="#171012",
                                          font=("Segoe UI", 9))
         self.lbl_wake_instala.pack(side=tk.LEFT, padx=10)
+        self.btn_wake_vcredist = tk.Button(
+            zona_w, text="⬇ Baixar componente que falta (Visual C++)",
+            command=lambda: __import__("webbrowser").open(wake_word.VCREDIST_URL),
+            bg="#33100c", fg="#ff9a8f", bd=0, font=("Segoe UI", 9, "bold"),
+            cursor="hand2", padx=12, pady=4)
+        # fica escondido até o instalador detectar essa falta específica
         self._atualiza_status_wake()
 
         # ---------- ATUALIZAÇÃO ----------
@@ -357,15 +363,30 @@ class PainelConfig(tk.Toplevel):
 
     def _instalar_wake(self):
         self.lbl_wake_instala.config(text="instalando (baixa um modelo de ~5 MB, única vez)…")
+        self.btn_wake_vcredist.pack_forget()
         def run():
             ok, msg = wake_word.install_and_download(
                 logger=lambda m: self.after(0, lambda mm=m: self.lbl_wake_instala.config(text=mm[:70]))
             )
-            self.after(0, lambda: self.lbl_wake_instala.config(
-                text=("✓ instalado!" if ok else f"✗ {msg[:60]}"),
-                fg=("#7dc98f" if ok else "#ff9a8f")))
-            self.after(0, self._atualiza_status_wake)
+            self.after(0, lambda: self._finaliza_instala_wake(ok, msg))
         threading.Thread(target=run, daemon=True).start()
+
+    def _finaliza_instala_wake(self, ok: bool, msg: str):
+        if ok:
+            self.lbl_wake_instala.config(text="✓ instalado!", fg="#7dc98f")
+            self.btn_wake_vcredist.pack_forget()
+        elif wake_word.VCREDIST_MARCADOR in msg:
+            # causa raiz conhecida: falta o Visual C++ Redistributable no Windows.
+            # mostra a instrução completa (sem truncar) e o botão de download direto.
+            explicacao = msg.split("::", 1)[1]
+            self.lbl_wake_instala.config(text=explicacao, fg="#ff9a8f",
+                                        wraplength=460, justify=tk.LEFT)
+            self.btn_wake_vcredist.pack(padx=10, pady=(0, 10), anchor="w")
+        else:
+            self.lbl_wake_instala.config(text=f"✗ {msg[:120]}", fg="#ff9a8f",
+                                        wraplength=460, justify=tk.LEFT)
+            self.btn_wake_vcredist.pack_forget()
+        self._atualiza_status_wake()
 
     def _checar_update(self):
         self.lbl_versao.config(text="consultando o GitHub…")

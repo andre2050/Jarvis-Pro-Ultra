@@ -24,6 +24,13 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+# Fix universal do erro "DLL load failed while importing onnxruntime_*" no
+# Windows: o onnxruntime (dependência do openwakeword) precisa deste runtime
+# nativo instalado no sistema. Link oficial e permanente da Microsoft.
+VCREDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+# Marcador interno pra UI reconhecer esse caso específico sem parsear texto solto.
+VCREDIST_MARCADOR = "PRECISA_VCREDIST"
+
 # Pretrained openwakeword model that listens for "Hey Jarvis".
 WAKE_MODEL = "hey_jarvis"
 # Score in [0,1]; above this counts as a detection. Tunable per environment.
@@ -92,7 +99,16 @@ def install_and_download(logger: Callable[[str], None] = print) -> tuple[bool, s
             except TypeError:
                 _u.download_models()   # older signature downloads the default set
         except Exception as e:
-            return False, f"model download failed: {e}"
+            texto_erro = str(e)
+            # Causa raiz mais comum no Windows: falta o Microsoft Visual C++
+            # Redistributable (x64) — o onnxruntime não consegue carregar sua
+            # DLL nativa sem ele. Detecta o padrão e devolve instrução com o
+            # link certo em vez do traceback técnico truncado.
+            if "dll load failed" in texto_erro.lower() and "onnx" in texto_erro.lower():
+                return False, (f"{VCREDIST_MARCADOR}::Falta um componente do Windows "
+                               f"(Microsoft Visual C++ Redistributable). Baixe e instale "
+                               f"em {VCREDIST_URL} — depois clique em 'Instalar agora' de novo, senhor.")
+            return False, f"model download failed: {texto_erro}"
 
         if not is_ready():
             return False, "installed, but the wake model could not be loaded."
