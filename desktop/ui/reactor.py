@@ -41,7 +41,15 @@ def _cor_letra(flick: float) -> str:
 
 class ArcReactorHud(tk.Canvas):
     def __init__(self, master, size: int = 430, **kw):
-        super().__init__(master, width=size, height=size, bg=_T("fundo"),
+        # v5.1.5: o canvas herda a cor de fundo do container — as bordas do
+        # canvas ficam INVISÍVEIS e o holograma parece flutuar na tela,
+        # sem o "quadrado" atrás do círculo (era bg=_T("fundo"), que tinha
+        # um tom levemente diferente do painel e aparecia como uma caixa).
+        try:
+            bg_canvas = master.cget("bg")
+        except Exception:
+            bg_canvas = _T("fundo")
+        super().__init__(master, width=size, height=size, bg=bg_canvas,
                          highlightthickness=0, **kw)
         self.size = size
         self.thinking = False
@@ -104,6 +112,14 @@ class ArcReactorHud(tk.Canvas):
         periodo = 0.9 if self.thinking else (6 if self.listening else 14)
         sweep = (el / periodo) * 360
         ang = math.radians(sweep)
+
+        # ---- BRILHO RADIAL atrás do círculo: luz emanando, não uma caixa ----
+        # (3 halos concêntricos com alpha caindo — o canvas é invisível, então
+        #  o que se vê em volta do holograma é esse glow, igual à foto)
+        halo = _T("principal")
+        for dist, stipp, wdt in ((1.06, "gray12", 10), (1.03, "gray25", 7), (1.005, "gray37", 4)):
+            self.create_oval(cx - r * dist, cy - r * dist, cx + r * dist, cy + r * dist,
+                             outline=halo, width=wdt, stipple=stipp)
 
         # ---- cross-hair discreto (cinza-azulado) ----
         for (x1, y1, x2, y2) in ((cx - r * 0.94, cy, cx + r * 0.94, cy),

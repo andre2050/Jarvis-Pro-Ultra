@@ -126,7 +126,9 @@ class JarvisApp(tk.Tk):
         corpo = tk.Frame(self, bg=self.cor("janela_bg"))
         corpo.pack(fill=tk.BOTH, expand=True)
 
-        esquerda = tk.Frame(corpo, bg=self.cor("painel_bg"), width=460)
+        # v5.1.5: sem painel visível à esquerda — o holograma flutua direto
+        # no fundo da janela (igual à foto de referência), sem "quadrado" atrás
+        esquerda = tk.Frame(corpo, bg=self.cor("janela_bg"), width=460)
         esquerda.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 6), pady=10)
         esquerda.pack_propagate(False)
         self.reator = ArcReactorHud(esquerda, size=430)
@@ -134,10 +136,10 @@ class JarvisApp(tk.Tk):
 
         # leituras vivas embaixo do reator
         self.lbl_leituras = tk.Label(esquerda, text="inicializando sensores…",
-                                     font=("Consolas", 9), fg=self.cor("dim"), bg=self.cor("painel_bg"))
+                                     font=("Consolas", 9), fg=self.cor("dim"), bg=self.cor("janela_bg"))
         self.lbl_leituras.pack(pady=(4, 12))
         tk.Label(esquerda, text="F4 alterna a voz  ·  senhor",
-                 font=("Consolas", 8), fg=self.cor("txt_fraco"), bg=self.cor("painel_bg")).pack(pady=(0, 14))
+                 font=("Consolas", 8), fg=self.cor("txt_fraco"), bg=self.cor("janela_bg")).pack(pady=(0, 14))
         self.after(2000, self._atualizar_leituras)
 
         direita = tk.Frame(corpo, bg=self.cor("painel_bg"))
