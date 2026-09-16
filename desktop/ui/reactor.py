@@ -75,10 +75,19 @@ class ArcReactorHud(tk.Canvas):
         r = min(w, h) * 0.46
         el = time.time() - self._t0
 
-        # v5.1.0: tema "radar" desenha o holograma circular da foto
+        # v5.1.0: tema "radar" desenha o holograma circular da foto;
+        # qualquer outro tema usa o reator de arco clássico.
+        # BUG CORRIGIDO (v5.1.2): faltava o "else" aqui — em qualquer tema
+        # que não fosse "radar" a tela ficava em branco pra sempre e o loop
+        # de animação morria (o after() de reagendamento só existia dentro
+        # do if, então nunca era chamado no caso padrão).
         if _tema.atual() == "radar":
             self._frame_radar(cx, cy, r, el)
-            self.after(40, self._frame)
+        else:
+            self._frame_arc(cx, cy, r, el)
+
+        self.after(40, self._frame)  # ~25 fps — reagenda sempre, uma única vez
+
     def _frame_radar(self, cx, cy, r, el):
         """HOLOGRAMA CIRCULAR da foto: núcleo teal, anel azul, branco nos
         detalhes e agulha vermelha varrendo. Estados: pensando 0,9s/volta,
@@ -213,8 +222,6 @@ class ArcReactorHud(tk.Canvas):
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
                              outline=teal, width=2, stipple="gray50")
 
-        self.after(40, self._frame)  # ~25 fps
-
     def _frame_arc(self, cx, cy, r, el):
         """Reator de arco clássico — o dial circular das versões anteriores."""
         principal = _T("principal")
@@ -326,5 +333,3 @@ class ArcReactorHud(tk.Canvas):
             raio = r * (0.46 + 0.03 * breathe)
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
                              outline=principal, width=2, stipple="gray50")
-
-        self.after(40, self._frame)  # ~25 fps
