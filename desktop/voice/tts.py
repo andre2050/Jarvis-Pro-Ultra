@@ -18,8 +18,23 @@ class Voz:
         self.config = config
         self.enabled = bool(config.get("voz_ativa", True))
         self._fila: queue.Queue = queue.Queue()
+        # v5.1.7: fim do silêncio — a UI sempre sabe POR QUE não fala
+        # status: "ok" | "sem_biblioteca" | "erro_engine" | "iniciando"
+        self._status = "iniciando"
+        self._erro = ""
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+
+    def estado(self) -> tuple:
+        """(pode_falar, motivo) — diagnóstico honesto pra UI avisar o usuário."""
+        if not TEM_PYTTSX3:
+            return False, ("pyttsx3 não está instalado (pip install pyttsx3) "
+                           "— dá pra instalar em 1 clique aqui nas configurações")
+        if self._status == "erro_engine":
+            return False, f"motor de voz falhou ao iniciar: {self._erro[:140]}"
+        if self._status == "iniciando":
+            return False, "motor de voz ainda inicializando…"
+        return True, "ok"
 
     # ---------- API ----------
 
@@ -44,21 +59,33 @@ class Voz:
 
     def _loop(self) -> None:
         if not TEM_PYTTSX3:
+            self._status = "sem_biblioteca"
             return
         engine = None
         try:
             engine = pyttsx3.init()
             self._configurar(engine)
-        except Exception:
+            self._status, self._erro = "ok", ""
+        except Exception as e:
             engine = None
+            self._status, self._erro = "erro_engine", str(e)
         while True:
             texto = self._fila.get()
             if engine is None:
-                continue
+                # v5.1.7: tenta reerguer o motor a cada fala perdida (antes:
+                # descartava em silêncio pra sempre depois da 1ª falha)
+                try:
+                    engine = pyttsx3.init()
+                    self._configurar(engine)
+                    self._status, self._erro = "ok", ""
+                except Exception as e:
+                    self._status, self._erro = "erro_engine", str(e)
+                    continue
             try:
                 engine.say(texto)
                 engine.runAndWait()
-            except Exception:
+            except Exception as e:
+                self._status, self._erro = "erro_engine", str(e)
                 try:
                     engine = pyttsx3.init()
                     self._configurar(engine)

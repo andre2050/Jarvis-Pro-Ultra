@@ -145,6 +145,7 @@ class JarvisApp(tk.Tk):
         direita = tk.Frame(corpo, bg=self.cor("painel_bg"))
         direita.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10), pady=10)
         self.chat = ChatPanel(direita)
+        self.after(700, self._checar_voz_inicial)
         self.chat.pack(fill=tk.BOTH, expand=True)
 
         # ---- chips de atalho ----
@@ -426,12 +427,27 @@ class JarvisApp(tk.Tk):
 
     # ==================== VOZ / CONFIG ====================
 
+    def _checar_voz_inicial(self):
+        """v5.1.7: se o JARVIS não consegue FALAR, o usuário fica sabendo
+        na hora — nunca mais silêncio sem explicação."""
+        ok, motivo = self.voz.estado()
+        if not ok:
+            self.chat.add("sistema",
+                          f"🎙 AVISO: não consigo falar em voz alta — {motivo}. "
+                          "Resolvo em ⚙ CONFIG → VOZ. Por enquanto respondo por escrito, senhor.")
+            self.btn_voz.config(fg=self.cor("txt_fraco"))
+
     def _alternar_voz(self):
         ligado = self.voz.alternar()
         config.save(self.cfg)
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if ligado else 'OFF'}",
                             fg=self.cor("vivo") if ligado else self.cor("txt_fraco"))
-        if not ligado:
+        if ligado:
+            ok, motivo = self.voz.estado()
+            if not ok:
+                self.chat.add("sistema",
+                              f"🎙 Voz LIGADA, mas com problema: {motivo} — corrija em ⚙ CONFIG, senhor.")
+        else:
             self.voz.falar("Voz desativada, senhor.")
 
     def _exportar_conversa(self):

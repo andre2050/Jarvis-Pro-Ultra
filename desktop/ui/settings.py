@@ -111,7 +111,17 @@ class PainelConfig(tk.Toplevel):
                             + (" · TTS ✓" if tts.TEM_PYTTSX3 else " · TTS indisponível (pip install pyttsx3)"))
         tk.Button(zona, text="Testar voz", command=self._testar_voz, bg="#a1160f",
                   fg="#ffe4de", bd=0, font=("Segoe UI", 9, "bold"), cursor="hand2",
-                  padx=12, pady=4).pack(padx=10, pady=(2, 10), anchor="w")
+                  padx=12, pady=4).pack(padx=10, pady=(2, 4), anchor="w")
+        # v5.1.7: status honesto da voz + instalação em 1 clique
+        self.lbl_voz_detalhe = tk.Label(zona, text="", fg="#9c8a86", bg="#171012",
+                                        font=("Segoe UI", 9), anchor="w",
+                                        justify=tk.LEFT, wraplength=460)
+        self.lbl_voz_detalhe.pack(fill=tk.X, padx=10, pady=(0, 4))
+        self.btn_voz_instalar = tk.Button(
+            zona, text="⬇ Instalar voz (1 clique — pyttsx3)",
+            command=self._instalar_voz, bg="#33100c", fg="#ff9a8f", bd=0,
+            font=("Segoe UI", 9, "bold"), cursor="hand2", padx=12, pady=4)
+        self._atualiza_status_voz()
 
         # ---------- PAINEL DE MEMÓRIA ----------
         self._secao("🧠 MEMÓRIAS DO J.A.R.V.I.S")
@@ -284,6 +294,35 @@ class PainelConfig(tk.Toplevel):
 
     def _testar_voz(self):
         self.app.voz.falar("Good evening. All systems are online and operating at full capacity.")
+        self.after(300, self._atualiza_status_voz)
+
+    def _atualiza_status_voz(self):
+        ok, motivo = self.app.voz.estado()
+        if ok:
+            self.lbl_voz_detalhe.config(text="✓ Voz do JARVIS funcionando (pyttsx3)",
+                                        fg="#7dc98f")
+            self.btn_voz_instalar.pack_forget()
+        else:
+            self.lbl_voz_detalhe.config(text=f"✗ O JARVIS NÃO ESTÁ CONSEGUINDO FALAR — {motivo}",
+                                        fg="#ff9a8f")
+            self.btn_voz_instalar.pack(fill=tk.X, padx=10, pady=(0, 10), anchor="w")
+
+    def _instalar_voz(self):
+        self.btn_voz_instalar.config(text="instalando pyttsx3…")
+        def run():
+            import subprocess, sys
+            r = subprocess.run([sys.executable, "-m", "pip", "install", "pyttsx3"],
+                               capture_output=True, text=True)
+            if r.returncode == 0:
+                self.after(0, lambda: self.lbl_voz_detalhe.config(
+                    text="✓ pyttsx3 instalado! FECHE E ABRA O JARVIS de novo pra voz ativar.",
+                    fg="#7dc98f"))
+                self.after(0, self.btn_voz_instalar.pack_forget)
+            else:
+                tail = (r.stderr or r.stdout or "").strip().splitlines()[-1:] or [""]
+                self.after(0, lambda: self.lbl_voz_detalhe.config(
+                    text=f"✗ falha na instalação: {tail[0][:110]}", fg="#ff9a8f"))
+        threading.Thread(target=run, daemon=True).start()
 
     # ==================== CÉREBRO / OLLAMA ====================
 
