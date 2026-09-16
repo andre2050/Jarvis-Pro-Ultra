@@ -4,7 +4,7 @@ Temas:
   - classico  · azul holográfico do JARVIS original (Homem de Ferro)
   - vermelho  · Reator de Arco Vermelho (o clássico das versões Android)
   - gold      · dourado Stark (MK III)
-  - radar     · holograma circular teal com sweep de radar (v5.1.0)
+  - radar     · holograma circular teal com sweep de radar (v5.1.0) — PADRÃO do projeto desde a v5.1.4
 """
 TEMAS = {
     "classico": {
@@ -46,7 +46,7 @@ TEMAS = {
     },
 }
 
-_ativo = "classico"
+_ativo = "radar"  # v5.1.4: holograma circular passa a ser o padrão do projeto
 
 
 def usar(nome: str) -> None:

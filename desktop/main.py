@@ -36,13 +36,13 @@ class JarvisApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{APP_NAME} v{__version__}")
-        self.configure(bg=theme.cor("janela_bg"))
         self.geometry("1120x760")
         self.minsize(960, 660)
 
         self.cfg = config.load()
-        theme.usar(self.cfg.get("tema", "classico"))
+        theme.usar(self.cfg.get("tema", "radar"))
         self.cor = theme.cor            # paleta do tema ativo (muda em ⚙ CONFIG)
+        self.configure(bg=self.cor("janela_bg"))  # só agora, com o tema já certo
         sync_api_keys(self.cfg)          # ações do Mark LIII leem config/api_keys.json
         self.voz = Voz(self.cfg)
         self.historico: list = []
