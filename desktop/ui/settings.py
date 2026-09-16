@@ -55,6 +55,12 @@ class PainelConfig(tk.Toplevel):
         tk.Button(linha_o, text="Verificar", command=self._verificar_ollama,
                   bg="#a1160f", fg="#ffe4de", bd=0, font=("Segoe UI", 9, "bold"),
                   cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=8)
+        # botão só aparece quando o Ollama não é encontrado — 1 clique pro download oficial
+        self.btn_ollama_baixar = tk.Button(
+            zona_c, text="⬇ Baixar Ollama (ollama.com)",
+            command=lambda: __import__("webbrowser").open("https://ollama.com/download"),
+            bg="#33100c", fg="#ff9a8f", bd=0, font=("Segoe UI", 9, "bold"),
+            cursor="hand2", padx=10, pady=4)
         self._verificar_ollama()
 
         # ---------- CHAVE DO GEMINI ----------
@@ -282,6 +288,8 @@ class PainelConfig(tk.Toplevel):
     # ==================== CÉREBRO / OLLAMA ====================
 
     def _verificar_ollama(self):
+        self.btn_ollama_baixar.pack_forget()
+        self.lbl_ollama.config(text="verificando…")
         def run():
             from core import ollama_client
             try:
@@ -289,12 +297,22 @@ class PainelConfig(tk.Toplevel):
                     modelos = ollama_client.modelos()
                     self.after(0, lambda: self._mostra_ollama(modelos))
                 else:
-                    self.after(0, lambda: self.lbl_ollama.config(
-                        text="Ollama não encontrado. Instale em ollama.com, depois `ollama pull llama3.2`"))
+                    self.after(0, self._ollama_nao_encontrado)
             except Exception as e:
                 erro_txt = str(e)
                 self.after(0, lambda: self.lbl_ollama.config(text=f"erro: {erro_txt}"))
         threading.Thread(target=run, daemon=True).start()
+
+    def _ollama_nao_encontrado(self):
+        # Não é bug do JARVIS: o Ollama é um programa separado (como o Docker),
+        # precisa ser instalado no Windows/Mac/Linux antes de aparecer aqui.
+        self.lbl_ollama.config(
+            text=("Ollama não encontrado no seu PC. É um programa separado — instale, "
+                  "depois abra um terminal e rode `ollama pull llama3.2`, então clique "
+                  "'Verificar' de novo. Enquanto isso, o Gemini (nuvem) continua funcionando "
+                  "normalmente se você marcar essa opção."),
+            wraplength=460, justify=tk.LEFT)
+        self.btn_ollama_baixar.pack(fill=tk.X, padx=10, pady=(0, 8), anchor="w")
 
     def _mostra_ollama(self, modelos: list):
         if not modelos:
