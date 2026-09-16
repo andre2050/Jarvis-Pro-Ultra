@@ -26,13 +26,14 @@ TEMAS = {
         "txt_claro": "#f2e6e4", "erro_bg": "#2a0d0d", "erro_fg": "#ff9a8f",
     },
     "radar": {
-        "principal": "#00e5c7", "vivo": "#5ffbe9", "dim": "#0a7a6a",
-        "escuro": "#063b34", "fundo": "#031012",
-        "glows": ["#03201d", "#063b34", "#0a5249", "#0a7a6a", "#10b39e"],
-        "janela_bg": "#020a0c", "painel_bg": "#051014", "painel2": "#082026",
-        "entrada_bg": "#0a2830", "user_bg": "#0c3f44", "chat_bg": "#051014",
-        "chat_fundo": "#030d10", "fg_dim": "#d8fff7", "txt_fraco": "#7aa89f",
-        "txt_claro": "#eafffb", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
+        # cores amostradas da foto de referência: núcleo teal + anel azul + branco
+        "principal": "#1baaad", "vivo": "#2cc5c8", "dim": "#0e5a5c",
+        "escuro": "#0a3a3c", "fundo": "#0d111c",
+        "glows": ["#0d2a2c", "#12494b", "#1baaad", "#2cc5c8", "#3fd8db"],
+        "janela_bg": "#090d16", "painel_bg": "#0d121c", "painel2": "#131a26",
+        "entrada_bg": "#101823", "user_bg": "#12324a", "chat_bg": "#0d121c",
+        "chat_fundo": "#0a0e18", "fg_dim": "#cfe8ea", "txt_fraco": "#7e8f96",
+        "txt_claro": "#e8f2f4", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
     },
     "gold": {
         "principal": "#ffb830", "vivo": "#ffd35e", "dim": "#a1730f",

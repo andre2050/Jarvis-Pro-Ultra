@@ -80,114 +80,138 @@ class ArcReactorHud(tk.Canvas):
             self._frame_radar(cx, cy, r, el)
             self.after(40, self._frame)
     def _frame_radar(self, cx, cy, r, el):
-        """HOLOGRAMA CIRCULAR (tema radar) — anéis, sweep giratório, blips."""
-        principal = _T("principal")
-        vivo = _T("vivo")
-        dim = _T("dim")
-        escuro = _T("escuro")
+        """HOLOGRAMA CIRCULAR da foto: núcleo teal, anel azul, branco nos
+        detalhes e agulha vermelha varrendo. Estados: pensando 0,9s/volta,
+        ouvindo 6s, ocioso 14s."""
+        teal = _T("principal")          # núcleo (#1baaad)
+        teal_vivo = _T("vivo")
+        teal_dim = _T("dim")
         glows = _tema.cores()["glows"]
+        AZUL = "#4a8fb5"                # anel externo azul da foto
+        AZUL_DIM = "#2a4a60"
+        BRANCO = "#dfe9ec"              # marcações em branco
+        VERMELHO = "#ff4238"            # agulha vermelha
 
-        # varredura: gira devagar (14s), 6s ouvindo, 0,9s pensando
         periodo = 0.9 if self.thinking else (6 if self.listening else 14)
         sweep = (el / periodo) * 360
         ang = math.radians(sweep)
 
-        # ---- cross-hair do retículo ----
-        self.create_line(cx - r * 0.90, cy, cx + r * 0.90, cy, fill=dim, width=1)
-        self.create_line(cx, cy - r * 0.90, cx, cy + r * 0.90, fill=dim, width=1)
+        # ---- cross-hair discreto (cinza-azulado) ----
+        for (x1, y1, x2, y2) in ((cx - r * 0.94, cy, cx + r * 0.94, cy),
+                                 (cx, cy - r * 0.94, cx, cy + r * 0.94)):
+            self.create_line(x1, y1, x2, y2, fill=AZUL_DIM, width=1)
 
-        # ---- anéis concêntricos (3) ----
-        for f in (0.30, 0.55, 0.80):
-            self.create_oval(cx - r * f, cy - r * f, cx + r * f, cy + r * f,
-                             outline=dim, width=1.4)
+        # ---- fundo do disco (levemente mais claro que a janela) ----
+        self.create_oval(cx - r * 0.90, cy - r * 0.90, cx + r * 0.90, cy + r * 0.90,
+                         fill=_T("escuro"), outline="")
 
-        # ---- sweep com rastros (4 fatias de alpha decrescente) ----
-        bbox = (cx - r * 0.80, cy - r * 0.80, cx + r * 0.80, cy + r * 0.80)
-        for i, (larg, stipp) in enumerate(((90, "gray12"), (55, "gray25"),
-                                           (30, "gray50"), (12, "gray75"))):
+        # ---- ANEL AZUL EXTERNO grosso (marca da foto: 0.6-0.85 do raio) ----
+        self.create_oval(cx - r * 0.78, cy - r * 0.78, cx + r * 0.78, cy + r * 0.78,
+                         outline=AZUL, width=int(r * 0.16))
+        self.create_oval(cx - r * 0.94, cy - r * 0.94, cx + r * 0.94, cy + r * 0.94,
+                         outline=AZUL_DIM, width=int(r * 0.05), stipple="gray25")
+        self.create_oval(cx - r * 0.65, cy - r * 0.65, cx + r * 0.65, cy + r * 0.65,
+                         outline=AZUL_DIM, width=1.5)
+
+        # ---- trilha do sweep (fatias teal com alpha decrescente) ----
+        bbox = (cx - r * 0.62, cy - r * 0.62, cx + r * 0.62, cy + r * 0.62)
+        for larg, stipp in ((90, "gray12"), (55, "gray25"), (30, "gray50")):
             self.create_arc(bbox, start=sweep - larg, extent=larg,
-                            style=tk.CHORD, fill=principal, outline="",
-                            stipple=stipp)
-        self.create_line(cx, cy, cx + r * 0.80 * math.cos(ang),
-                          cy + r * 0.80 * math.sin(ang), fill=vivo, width=2)
+                            style=tk.CHORD, fill=teal, outline="", stipple=stipp)
 
-        # ---- blips: acendem quando o sweep passa, depois desvanecem ----
-        # posições fixas por índice (8 alvos "monitorados" pelo sistema)
+        # ---- ANEL DE TRILHA teal-escuro onde os blips vivem ----
+        self.create_oval(cx - r * 0.62, cy - r * 0.62, cx + r * 0.62, cy + r * 0.62,
+                         outline=teal_dim, width=1.4)
+        self.create_oval(cx - r * 0.44, cy - r * 0.44, cx + r * 0.44, cy + r * 0.44,
+                         outline=teal_dim, width=1)
+
+        # ---- AGULHA VERMELHA do radar ----
+        self.create_line(cx, cy, cx + r * 0.62 * math.cos(ang),
+                         cy + r * 0.62 * math.sin(ang), fill=VERMELHO, width=2)
+
+        # ---- blips: acendem quando a agulha passa ----
         for i in range(8):
             b_ang = (i * 47 + 13) % 360
-            b_dist = 0.22 + (i % 3) * 0.19          # 0.22 / 0.41 / 0.60 do raio
+            b_dist = 0.50 + (i % 2) * 0.09
             a = math.radians(b_ang)
             bx = cx + r * b_dist * math.cos(a)
             by = cy + r * b_dist * math.sin(a)
-            atraso = (sweep - b_ang) % 360           # quanto o sweep passou dele
-            brilho = max(0.0, 1.0 - atraso / 360)    # 1.0 → 0.0 ao longo de 1 volta
+            atraso = (sweep - b_ang) % 360
+            brilho = max(0.0, 1.0 - atraso / 360)
             if brilho <= 0.02:
                 continue
-            raio = 3 + 4 * brilho
+            raio = 2.5 + 3.5 * brilho
             idx = min(len(glows) - 1, int(brilho * len(glows)))
             self.create_oval(bx - raio, by - raio, bx + raio, by + raio,
-                             fill=glows[len(glows) - 1 - idx] if brilho > 0.6 else dim,
+                             fill=BRANCO if brilho > 0.65 else glows[idx],
                              outline="")
-            if brilho > 0.25:
+            if brilho > 0.30:
                 self.create_oval(bx - raio - 5, by - raio - 5, bx + raio + 5, by + raio + 5,
                                  outline=glows[-2], width=1, stipple="gray25")
 
-        # ---- ticks externos (72 marcações, grandes a cada 6) ----
+        # ---- ticks BRANCOS no anel azul (72, grandes a cada 6) ----
         n_ticks = 72
-        r_out = r * 0.88
+        r_out = r * 0.86
         for i in range(n_ticks):
             grande = i % 6 == 0
             a = i * (360 / n_ticks) * math.pi / 180
-            tamanho = 12 if grande else 5
+            tamanho = 13 if grande else 5
             x1 = cx + (r_out - tamanho) * math.cos(a)
             y1 = cy + (r_out - tamanho) * math.sin(a)
             x2 = cx + r_out * math.cos(a)
             y2 = cy + r_out * math.sin(a)
-            self.create_line(x1, y1, x2, y2, fill=principal if grande else dim,
+            self.create_line(x1, y1, x2, y2, fill=BRANCO if grande else AZUL_DIM,
                              width=2 if grande else 1)
 
-        # ---- bezel duplo ----
-        self.create_oval(cx - r * 0.92, cy - r * 0.92, cx + r * 0.92, cy + r * 0.92,
-                         outline=dim, width=1.5)
-        self.create_oval(cx - r * 0.995, cy - r * 0.995, cx + r * 0.995, cy + r * 0.995,
-                         outline=escuro, width=1.5)
+        # ---- NÚCLEO TEAL brilhante (o coração da foto) ----
+        self.create_oval(cx - r * 0.34, cy - r * 0.34, cx + r * 0.34, cy + r * 0.34,
+                         fill=teal, outline="")
+        self.create_oval(cx - r * 0.40, cy - r * 0.40, cx + r * 0.40, cy + r * 0.40,
+                         outline=teal_dim, width=1.2)
+        # brilho extra pulsando devagar
+        pulso = 0.5 + 0.5 * math.sin(el * 2.4)
+        self.create_oval(cx - r * (0.36 + 0.02 * pulso), cy - r * (0.36 + 0.02 * pulso),
+                         cx + r * (0.36 + 0.02 * pulso), cy + r * (0.36 + 0.02 * pulso),
+                         outline=teal_vivo, width=2, stipple="gray50")
 
-        # ---- rótulos orbitais ----
+        # ---- rótulos BRANCOS orbitais ----
         labels = ["H E R M E S", "R E D E", "M E M", "V O Z"]
         for i, lbl in enumerate(labels):
             a = (-90 + i * 90) * math.pi / 180
-            lx, ly = cx + r * 0.67 * math.cos(a), cy + r * 0.67 * math.sin(a)
-            self.create_text(lx, ly, text=lbl, fill=vivo,
-                             font=("Consolas", max(9, int(r * 0.05))))
+            lx, ly = cx + r * 0.78 * math.cos(a), cy + r * 0.78 * math.sin(a)
+            self.create_text(lx, ly, text=lbl, fill=BRANCO,
+                             font=("Consolas", max(8, int(r * 0.045))))
 
-        # ---- núcleo: disco de leitura (bateria/CPU) ----
-        self.create_oval(cx - r * 0.17, cy - r * 0.17, cx + r * 0.17, cy + r * 0.17,
-                         fill=glows[2], outline="")
+        # ---- leitura no núcleo (bateria/CPU), texto branco ----
         if self.thinking:
             centro = "···"
         elif self._bat is not None:
             centro = str(self._bat)
         else:
             centro = f"{self._cpu:.0f}"
-        self.create_text(cx, cy, text=centro, fill=vivo,
-                         font=("Consolas", int(r * 0.13), "bold"))
+        self.create_text(cx, cy, text=centro, fill=BRANCO,
+                         font=("Consolas", int(r * 0.16), "bold"))
         rotulo = "BAT%" if self._bat is not None else "CPU%"
         if not self.thinking:
-            self.create_text(cx, cy - r * 0.26, text=rotulo, fill=dim,
-                             font=("Consolas", max(8, int(r * 0.05))))
+            self.create_text(cx, cy - r * 0.22, text=rotulo, fill=BRANCO,
+                             font=("Consolas", max(8, int(r * 0.045))))
 
-        # ---- hora · data embaixo ----
+        # ---- hora · data embaixo, azul ----
         import datetime as _dt
         agora = _dt.datetime.now()
-        self.create_text(cx, cy + r * 0.34,
+        self.create_text(cx, cy + r * 0.24,
                          text=agora.strftime("%H:%M") + f" · {agora.day} DE {SEMANA[agora.weekday()]}",
-                         fill=dim, font=("Consolas", max(9, int(r * 0.05))))
+                         fill=BRANCO, font=("Consolas", max(8, int(r * 0.045))))
 
-        # ---- aura extra quando falando ou ouvindo ----
+        # ---- bezel externo ----
+        self.create_oval(cx - r * 0.995, cy - r * 0.995, cx + r * 0.995, cy + r * 0.995,
+                         outline=AZUL_DIM, width=1.5)
+
+        # ---- aura quando falando ou ouvindo ----
         if self.speaking or self.listening:
-            raio = r * (0.88 + 0.02 * math.sin(el * 6))
+            raio = r * (0.92 + 0.02 * math.sin(el * 6))
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
-                             outline=principal, width=2, stipple="gray50")
+                             outline=teal, width=2, stipple="gray50")
 
         self.after(40, self._frame)  # ~25 fps
 
