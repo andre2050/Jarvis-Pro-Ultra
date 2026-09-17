@@ -11,6 +11,7 @@ object SettingsStore {
     private const val KEY_API = "gemini_api_key"
     private const val KEY_VOICE = "voice_enabled"
     private const val KEY_TTS_RATE = "tts_rate"
+    private const val KEY_THEME = "hud_theme"
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -30,6 +31,13 @@ object SettingsStore {
 
     fun setTtsRate(ctx: Context, rate: Float) {
         prefs(ctx).edit().putFloat(KEY_TTS_RATE, rate).apply()
+    }
+
+    /** Tema do holograma: "radar" (padrão, edição desktop v5.1) ou "arc" (clássico vermelho). */
+    fun getTheme(ctx: Context): String = prefs(ctx).getString(KEY_THEME, "radar") ?: "radar"
+
+    fun setTheme(ctx: Context, tema: String) {
+        prefs(ctx).edit().putString(KEY_THEME, if (tema == "arc") "arc" else "radar").apply()
     }
 
     fun hasApiKey(ctx: Context): Boolean = getApiKey(ctx).length >= 20

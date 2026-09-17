@@ -102,6 +102,7 @@ fun JarvisApp() {
     var voiceWork by remember { mutableStateOf<String?>(null) }
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
     var handsFree by remember { mutableStateOf("off") }
+    var tema by remember { mutableStateOf(SettingsStore.getTheme(ctx)) }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
     // --- VISÃO COMPUTACIONAL v4.5.0 ---
     var pendingFacing by remember { mutableStateOf(androidx.camera.core.CameraSelector.LENS_FACING_BACK) }
@@ -293,15 +294,27 @@ fun JarvisApp() {
                     Spacer(Modifier.height(8.dp))
                     StatChip(label = "VOZ", value = if (handsFree == "on") "ON" else "OFF")
                 }
-                ArcReactorHud(
-                    modifier = Modifier
-                        .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
-                        .size(190.dp),
-                    ctx = ctx,
-                    isSpeaking = isSpeaking,
-                    isThinking = isThinking,
-                    isListening = (handsFree == "on")
-                )
+                if (tema == "radar") {
+                    RadarHud(
+                        modifier = Modifier
+                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
+                            .size(190.dp),
+                        ctx = ctx,
+                        isSpeaking = isSpeaking,
+                        isThinking = isThinking,
+                        isListening = (handsFree == "on")
+                    )
+                } else {
+                    ArcReactorHud(
+                        modifier = Modifier
+                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
+                            .size(190.dp),
+                        ctx = ctx,
+                        isSpeaking = isSpeaking,
+                        isThinking = isThinking,
+                        isListening = (handsFree == "on")
+                    )
+                }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     StatChip(label = "NET", value = netStatus(ctx))
                     Spacer(Modifier.height(8.dp))
@@ -557,6 +570,20 @@ fun JarvisApp() {
                     }) { Text("Testar chave", fontSize = 12.sp) }
                     testResult?.let { tr ->
                         Text(tr, fontSize = 12.sp, color = Cyan)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("TEMA DO HOLOGRAMA", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("O radar holográfico teal da edição desktop v5.1 — ou o Reator de Arco vermelho clássico. Troca na hora, sem reiniciar.", fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Row {
+                        TextButton(onClick = {
+                            SettingsStore.setTheme(ctx, "radar"); tema = "radar"
+                        }) { Text(if (tema == "radar") "\u25cf Radar (ativo)" else "Radar", fontSize = 12.sp, color = if (tema == "radar") Cyan else Color.Unspecified) }
+                        TextButton(onClick = {
+                            SettingsStore.setTheme(ctx, "arc"); tema = "arc"
+                        }) { Text(if (tema == "arc") "\u25cf Reator de Arco (ativo)" else "Reator de Arco", fontSize = 12.sp, color = if (tema == "arc") Cyan else Color.Unspecified) }
                     }
 
                     Spacer(Modifier.height(16.dp))

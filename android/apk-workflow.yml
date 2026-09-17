@@ -1,0 +1,46 @@
+# ── Build automático do APK do JARVIS ────────────────────────────────────────
+# COMO ATIVAR (1 minuto, uma vez só):
+#   1. Abra github.com/andre2050/Jarvis-Pro-Ultra no navegador
+#   2. Clique em Add file → Create new file
+#   3. Nomeie exatamente:  .github/workflows/build-apk.yml
+#      (digite ".github/" → aparece "Create new folder" → Enter, depois "workflows/" → Enter)
+#   4. Cole TODO o conteúdo deste arquivo e salve (Commit changes)
+#   5. Pronto: toda tag v*-android que eu publicar gera um APK instalável na release.
+#      Também dá pra disparar na mão: aba Actions → Build APK → Run workflow.
+name: Build APK do JARVIS
+
+on:
+  push:
+    tags: ["v*-android"]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: SDK do Android
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      - name: Compilar o APK (debug, já assinado e instalável)
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Anexar o APK na release da tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
