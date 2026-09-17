@@ -11,17 +11,28 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 27
-        versionName = "4.7.0"
+        versionCode = 28
+        versionName = "4.7.1"
     }
 
+    // Assinatura FIXA (v4.7.1): toda build — sandbox, Actions ou PC — usa a mesma
+    // chave (android/keys/jarvis-update.jks), então toda atualização instala por cima
+    // sem o erro "app não foi instalado" de assinatura diferente.
+    // Chave pessoal do projeto: apps avulsos, sem loja. Variáveis de ambiente ainda
+    // têm prioridade caso você um dia queira assinar com outra chave.
+    val ksJarvis = rootProject.file("keys/jarvis-update.jks")
     signingConfigs {
-        create("release") {
-            // keystore gerado na máquina que compila; NUNCA commitar as senhas
-            storeFile = file(System.getenv("JARVIS_KEYSTORE") ?: "jarvis-release.jks")
-            storePassword = System.getenv("JARVIS_KEYSTORE_PASS") ?: ""
+        getByName("debug") {
+            storeFile = ksJarvis
+            storePassword = System.getenv("JARVIS_KEYSTORE_PASS") ?: "jarvis2026"
             keyAlias = System.getenv("JARVIS_KEY_ALIAS") ?: "jarvis"
-            keyPassword = System.getenv("JARVIS_KEY_PASS") ?: ""
+            keyPassword = System.getenv("JARVIS_KEY_PASS") ?: "jarvis2026"
+        }
+        create("release") {
+            storeFile = System.getenv("JARVIS_KEYSTORE")?.let { file(it) } ?: ksJarvis
+            storePassword = System.getenv("JARVIS_KEYSTORE_PASS") ?: "jarvis2026"
+            keyAlias = System.getenv("JARVIS_KEY_ALIAS") ?: "jarvis"
+            keyPassword = System.getenv("JARVIS_KEY_PASS") ?: "jarvis2026"
         }
     }
 
@@ -29,9 +40,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (System.getenv("JARVIS_KEYSTORE") != null) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

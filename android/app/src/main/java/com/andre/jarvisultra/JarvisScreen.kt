@@ -98,6 +98,8 @@ fun JarvisApp() {
     var apiKeySaved by remember { mutableStateOf(SettingsStore.hasApiKey(ctx)) }
     var showSettings by remember { mutableStateOf(!apiKeySaved) }
     var updateInfo by remember { mutableStateOf<String?>(null) }
+    var updateApk by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var updateMsg by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var voiceWork by remember { mutableStateOf<String?>(null) }
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
@@ -621,17 +623,42 @@ fun JarvisApp() {
                     Spacer(Modifier.height(16.dp))
                     Text("ATUALIZAÇÃO", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
                     Spacer(Modifier.height(6.dp))
-                    Text("Verifico novas versões direto no GitHub — instala por cima sem perder nada.", fontSize = 12.sp)
+                    Text("Verifico a versão nova direto no GitHub, baixo o APK e abro o instalador — você só confirma na tela. A partir da v4.7.1 toda atualização instala por cima sem perder nada.", fontSize = 12.sp)
                     Row {
                         TextButton(onClick = {
-                            updateInfo = "Verificando atualizações no GitHub, senhor…"
+                            updateMsg = "Verificando atualizações no GitHub, senhor…"
                             scope.launch {
-                                updateInfo = try { Updater.check() } catch (e: Exception) { e.message ?: "erro de conexão ao verificar atualização" }
+                                try {
+                                    val r = Updater.checar()
+                                    updateMsg = r.msg
+                                    updateApk = if (r.apkUrl != null) Pair(r.apkUrl, r.apkName ?: "atualizacao.apk") else null
+                                } catch (e: Exception) {
+                                    updateMsg = e.message ?: "erro de conexão ao verificar atualização"
+                                }
                             }
                         }) { Text("Verificar agora", fontSize = 12.sp) }
                         TextButton(onClick = {
                             ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Updater.RELEASES_URL)))
                         }) { Text("Página de releases", fontSize = 12.sp) }
+                    }
+                    if (updateApk != null) {
+                        TextButton(onClick = {
+                            val (url, _) = updateApk!!
+                            updateMsg = "Iniciando download, senhor…"
+                            updateApk = null
+                            scope.launch {
+                                try {
+                                    val apk = Updater.baixar(ctx, url) { prog -> updateMsg = prog }
+                                    updateMsg = "Download concluído — abrindo o instalador. Confirme na tela."
+                                    Updater.instalar(ctx, apk)
+                                } catch (e: Exception) {
+                                    updateMsg = "Falha no download: ${e.message ?: "sem detalhes"}"
+                                }
+                            }
+                        }) { Text("Baixar e instalar agora", fontSize = 12.sp, color = Cyan) }
+                    }
+                    updateMsg?.let { ui ->
+                        Text(ui, fontSize = 12.sp, color = Cyan)
                     }
 
                     Spacer(Modifier.height(16.dp))

@@ -9,6 +9,8 @@
 
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Atualizador v4.7.1: baixar o APK e abrir o instalador do sistema -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Câmera nativa v4.6.0: visão computacional frontal/traseira -->
     <uses-permission android:name="android.permission.CAMERA" />
