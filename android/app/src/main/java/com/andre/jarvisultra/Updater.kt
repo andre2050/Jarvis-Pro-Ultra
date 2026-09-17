@@ -82,10 +82,10 @@ object Updater {
                 when {
                     isNewer(versao, local) -> {
                         if (apkUrl == null) Resultado(
-                            "Nova versão $versão disponível, mas sem APK anexado à release — " +
+                            "Nova versão $versao disponível, mas sem APK anexado à release — " +
                             "baixe pela página de releases, senhor.")
                         else Resultado(
-                            "Nova versão disponível: $versão (instalada: $local), senhor.",
+                            "Nova versão disponível: $versao (instalada: $local), senhor.",
                             apkUrl, apkName)
                     }
                     else -> Resultado("Você está na versão mais recente, senhor. ($local)")
