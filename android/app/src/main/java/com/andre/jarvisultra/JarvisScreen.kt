@@ -382,6 +382,35 @@ fun JarvisApp() {
             )
         }
 
+        // ---- chips de comandos rápidos (v4.7.4: agora no TOPO da tela) ----
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                "⏰ Alarme 7h" to "Define um alarme às 7 da manhã",
+                "☁️ Clima" to "Como está o clima agora?",
+                "🛰 Modo mesa" to "Abra o modo mesa",
+                "💡 Lanterna" to "Liga a lanterna",
+                "📱 YouTube" to "Abre o YouTube",
+                "📞 Ligar" to "Pelo que eu posso te ligar, JARVIS? Use a tool ligar_para."
+            ).forEach { (rotulo, cmd) ->
+                Surface(
+                    onClick = { if (!isThinking) send(cmd) },
+                    color = Color(0x1200E5C7),
+                    contentColor = Cyan,
+                    border = BorderStroke(1.dp, HoloLine),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(rotulo, fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                }
+            }
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
@@ -461,35 +490,6 @@ fun JarvisApp() {
                     Text(s.label, fontSize = 12.sp, color = CyanDim)
                 }
             }
-            // ---- chips de comandos rápidos (v4.7.3) ----
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(
-                    "⏰ Alarme 7h" to "Define um alarme às 7 da manhã",
-                    "☁️ Clima" to "Como está o clima agora?",
-                    "🛰 Modo mesa" to "Abra o modo mesa",
-                    "💡 Lanterna" to "Liga a lanterna",
-                    "📱 YouTube" to "Abre o YouTube",
-                    "📞 Ligar" to "Pelo que eu posso te ligar, JARVIS? Use a tool ligar_para."
-                ).forEach { (rotulo, cmd) ->
-                    Surface(
-                        onClick = { if (!isThinking) send(cmd) },
-                        color = Color(0x1200E5C7),
-                        contentColor = Cyan,
-                        border = BorderStroke(1.dp, HoloLine),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(rotulo, fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-                    }
-                }
-            }
-
             Row(
                 Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
