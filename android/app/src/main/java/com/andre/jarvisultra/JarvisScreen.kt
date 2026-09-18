@@ -662,6 +662,14 @@ fun JarvisApp() {
                     }
 
                     Spacer(Modifier.height(16.dp))
+                    Text("MODO MESA/CARRO", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Tela cheia sempre ligada: radar grande, relógio, clima ao vivo e bateria — o celular vira um painel do Homem de Ferro. Toque na tela pra sair.", fontSize = 12.sp)
+                    TextButton(onClick = {
+                        ctx.startActivity(Intent(ctx, DeskModeActivity::class.java))
+                    }) { Text("Abrir modo mesa", fontSize = 12.sp, color = Cyan) }
+
+                    Spacer(Modifier.height(16.dp))
                     Text("SOBRE", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
                     Spacer(Modifier.height(6.dp))
                     Text(

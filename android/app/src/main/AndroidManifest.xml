@@ -36,6 +36,13 @@
             </intent-filter>
         </activity>
     
+    <!-- Modo mesa/carro (v4.7.2): painel holográfico em tela cheia -->
+    <activity
+        android:name=".DeskModeActivity"
+        android:exported="false"
+        android:screenOrientation="portrait"
+        android:theme="@style/Theme.JarvisUltra" />
+
     <!-- Câmera nativa do JARVIS: frontal/traseira -->
     <activity
         android:name=".JarvisCameraActivity"
