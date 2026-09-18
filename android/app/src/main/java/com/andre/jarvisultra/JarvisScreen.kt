@@ -197,6 +197,13 @@ fun JarvisApp() {
         }
     }
 
+    /** Fala com dublagem real: agenda os visemas no rosto e guarda a cauda anti-eco. */
+    fun say(texto: String) {
+        lastSpoken = texto
+        speakingText = texto
+        voice.speak(texto)
+    }
+
     val cameraActivity = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         if (res.resultCode == Activity.RESULT_OK) {
             res.data?.getStringExtra(JarvisCameraActivity.EXTRA_PATH)?.let { path ->
@@ -232,13 +239,6 @@ fun JarvisApp() {
     DisposableEffect(Unit) {
         JarvisVisao.onCaptureRequest = { pergunta, camera -> mainHandler.post { abrirCamera(pergunta, camera) } }
         onDispose { JarvisVisao.onCaptureRequest = null }
-    }
-
-    /** Fala com dublagem real: agenda os visemas no rosto e guarda a cauda anti-eco. */
-    fun say(texto: String) {
-        lastSpoken = texto
-        speakingText = texto
-        voice.speak(texto)
     }
 
     fun send(forced: String? = null) {
