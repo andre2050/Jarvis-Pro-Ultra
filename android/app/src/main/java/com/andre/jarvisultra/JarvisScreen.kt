@@ -36,6 +36,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -460,6 +461,35 @@ fun JarvisApp() {
                     Text(s.label, fontSize = 12.sp, color = CyanDim)
                 }
             }
+            // ---- chips de comandos rápidos (v4.7.3) ----
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "⏰ Alarme 7h" to "Define um alarme às 7 da manhã",
+                    "☁️ Clima" to "Como está o clima agora?",
+                    "🛰 Modo mesa" to "Abra o modo mesa",
+                    "💡 Lanterna" to "Liga a lanterna",
+                    "📱 YouTube" to "Abre o YouTube",
+                    "📞 Ligar" to "Pelo que eu posso te ligar, JARVIS? Use a tool ligar_para."
+                ).forEach { (rotulo, cmd) ->
+                    Surface(
+                        onClick = { if (!isThinking) send(cmd) },
+                        color = Color(0x1200E5C7),
+                        contentColor = Cyan,
+                        border = BorderStroke(1.dp, HoloLine),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(rotulo, fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                    }
+                }
+            }
+
             Row(
                 Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -660,6 +690,22 @@ fun JarvisApp() {
                     updateMsg?.let { ui ->
                         Text(ui, fontSize = 12.sp, color = Cyan)
                     }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("CATÁLOGO DE COMANDOS", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Fale no 🎙 (ou no ícone de telefone pra mãos-livres) ou digite — eu executo:\n\n" +
+                        "📞 Ligar pra Edna · Mandar WhatsApp pra Edna dizendo 'cheguei'\n" +
+                        "⏰ Alarme às 7h · Timer de 10 minutos\n" +
+                        "📅 Lembrar dentista amanhã às 15h (abre na agenda)\n" +
+                        "✉️ Enviar email para fulano@x.com\n" +
+                        "📱 Abrir YouTube · Pesquisar resultado do jogo\n" +
+                        "💡 Liga a lanterna · Como tá o clima? · Onde eu estou?\n" +
+                        "🛰 Abrir modo mesa · O que você lembra de mim?\n\n" +
+                        "Tudo por permissões oficiais do Android, sem root.",
+                        fontSize = 12.sp
+                    )
 
                     Spacer(Modifier.height(16.dp))
                     Text("MODO MESA/CARRO", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)

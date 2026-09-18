@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
+import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.telephony.SmsManager
@@ -98,6 +99,25 @@ object JarvisPhoneTools {
             JSONObject().put("nome", JSONObject().put("type", "string").put("description", "nome do app")),
             JSONArray().put("nome")))
 
+        r.put(obj("abrir_modo_mesa",
+            "Abre o Modo Mesa/Carro: painel holográfico em tela cheia sempre ligado, com relógio, clima ao vivo e bateria. Use quando o senhor pedir 'modo mesa', 'modo carro' ou 'painel'."))
+
+        r.put(obj("criar_lembrete",
+            "Cria um evento na agenda do celular. VOCÊ calcula a data e hora do pedido e passa em milissegundos Unix. Ex: 'lembrete do dentista amanhã às 15h'.",
+            JSONObject()
+                .put("titulo", JSONObject().put("type", "string").put("description", "título do evento"))
+                .put("inicio_ms", JSONObject().put("type", "integer").put("description", "início em milissegundos Unix (epoch) — calcule a partir do pedido do senhor"))
+                .put("minutos", JSONObject().put("type", "integer").put("description", "duração em minutos, padrão 60")),
+            JSONArray().put("titulo").put("inicio_ms")))
+
+        r.put(obj("enviar_email",
+            "Abre o app de email com a mensagem pronta — o senhor só confere e toca em enviar.",
+            JSONObject()
+                .put("para", JSONObject().put("type", "string").put("description", "email do destinatário"))
+                .put("assunto", JSONObject().put("type", "string").put("description", "assunto, opcional"))
+                .put("corpo", JSONObject().put("type", "string").put("description", "texto da mensagem, opcional")),
+            JSONArray().put("para")))
+
         return r
     }
 
@@ -116,6 +136,9 @@ object JarvisPhoneTools {
             "definir_timer" -> definirTimer(ctx, args)
             "pesquisar_web" -> pesquisarWeb(ctx, args)
             "listar_memorias" -> listarMemorias(ctx, args)
+            "abrir_modo_mesa" -> abrirModoMesa(ctx)
+            "criar_lembrete" -> criarLembrete(ctx, args)
+            "enviar_email" -> enviarEmail(ctx, args)
             else -> null
         }
     } catch (e: Exception) {
@@ -286,4 +309,40 @@ object JarvisPhoneTools {
         return if (ms.isEmpty()) "ainda não guardei nenhum fato, senhor — me peça pra lembrar de algo."
         else "o que sei do senhor:\n- " + ms.joinToString("\n- ")
     }
+
+    // ---------- v4.7.3: modo mesa, agenda e email ----------
+
+    private fun abrirModoMesa(ctx: Context): String = try {
+        ctx.startActivity(Intent(ctx, DeskModeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        "modo mesa aberto, senhor — o painel holográfico assume a tela."
+    } catch (e: Exception) {
+        "falha ao abrir o modo mesa: ${e.message ?: "sem detalhes"}"
+    }
+
+    private fun criarLembrete(ctx: Context, args: JSONObject): String = try {
+        val inicio = args.optLong("inicio_ms", System.currentTimeMillis())
+        val dur = args.optInt("minutos", 60)
+        val intent = Intent(Intent.ACTION_INSERT)
+            .setData(CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, inicio)
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, inicio + dur * 60_000L)
+            .putExtra(CalendarContract.Events.TITLE, args.optString("titulo"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(intent)
+        "abri a agenda com o lembrete '" + args.optString("titulo") + "' pronto, senhor — só tocar em salvar."
+    } catch (e: Exception) {
+        "falha ao abrir a agenda: ${e.message ?: "sem detalhes"}"
+    }
+
+    private fun enviarEmail(ctx: Context, args: JSONObject): String = try {
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + Uri.encode(args.optString("para"))))
+            .putExtra(Intent.EXTRA_SUBJECT, args.optString("assunto"))
+            .putExtra(Intent.EXTRA_TEXT, args.optString("corpo"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(intent)
+        "email pronto pro senhor conferir e enviar."
+    } catch (e: Exception) {
+        "falha ao abrir o email: ${e.message ?: "sem detalhes"}"
+    }
+
 }
