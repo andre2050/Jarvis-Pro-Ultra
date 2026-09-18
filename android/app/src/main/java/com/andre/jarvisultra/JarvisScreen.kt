@@ -103,7 +103,6 @@ fun JarvisApp() {
     var updateMsg by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var voiceWork by remember { mutableStateOf<String?>(null) }
-    var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
     var handsFree by remember { mutableStateOf("off") }
     var tema by remember { mutableStateOf(SettingsStore.getTheme(ctx)) }
     var speakingText by remember { mutableStateOf<String?>(null) }
@@ -136,10 +135,6 @@ fun JarvisApp() {
 
     val history = remember { JSONArray() }
     val listState = rememberLazyListState()
-
-    LaunchedEffect(Unit) {
-        suggestion = try { JarvisMemory.suggest(ctx) } catch (e: Exception) { null }
-    }
 
     LaunchedEffect(apiKeySaved) {
         if (apiKeySaved) {
@@ -243,7 +238,6 @@ fun JarvisApp() {
 
     fun send(forced: String? = null) {
         val msg = (forced ?: input).trim()
-        suggestion = null
         if (msg.isEmpty() || isThinking) return
         if (!apiKeySaved) {
             messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — toque na engrenagem no topo, cole a chave e salve. Aí sim, às ordens.")
@@ -482,14 +476,6 @@ fun JarvisApp() {
         ) {
             if (handsFree != "off" && handsFree != "on") {
                 Text(handsFree, Modifier.padding(start = 12.dp, top = 4.dp), fontSize = 11.sp, color = CyanDim)
-            }
-            suggestion?.let { s ->
-                TextButton(
-                    onClick = { suggestion = null; send(s.message) },
-                    modifier = Modifier.padding(start = 6.dp, top = 2.dp)
-                ) {
-                    Text(s.label, fontSize = 12.sp, color = CyanDim)
-                }
             }
             Row(
                 Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
