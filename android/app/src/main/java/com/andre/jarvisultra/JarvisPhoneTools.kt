@@ -95,7 +95,7 @@ object JarvisPhoneTools {
             JSONObject().put("quantidade", JSONObject().put("type", "integer").put("description", "quantos, padrão 10"))))
 
         r.put(obj("abrir_app",
-            "Abre um app instalado pelo nome, ex: 'abre o YouTube'.",
+            "Abre um app instalado pelo nome COMUM, sem mistério: 'abrir email' abre o Gmail, 'abrir zap' o WhatsApp, 'abrir navegador', 'abrir mapa', 'abrir agenda', 'abrir play store', 'abrir instagram' e qualquer outro app pelo nome.",
             JSONObject().put("nome", JSONObject().put("type", "string").put("description", "nome do app")),
             JSONArray().put("nome")))
 
@@ -270,18 +270,96 @@ object JarvisPhoneTools {
     }
 
     private fun abrirApp(ctx: Context, args: JSONObject): String {
-        val nome = args.optString("nome").trim().lowercase()
+        val nome = args.optString("nome").trim()
+        if (nome.isEmpty()) return "diga o nome do app, senhor."
+        val alvo = normalizar(nome)
         val pm = ctx.packageManager
-        val alvo = pm.getInstalledApplications(0).firstOrNull {
-            pm.getApplicationLabel(it).toString().lowercase().contains(nome) ||
-                it.packageName.lowercase().contains(nome)
-        } ?: return "não achei app chamado '" + nome + "', senhor."
-        val i = pm.getLaunchIntentForPackage(alvo.packageName)
-            ?: return "'" + pm.getApplicationLabel(alvo) + "' não tem tela pra abrir, senhor."
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ctx.startActivity(i)
-        return "abrindo " + pm.getApplicationLabel(alvo) + ", senhor."
+
+        // 1) apelidos brasileiros comuns → pacote oficial (o Gmail nunca contém 'email'!)
+        for ((apelido, pacote) in APELIDOS_APPS) {
+            if (alvo == apelido || alvo.contains(apelido)) {
+                val i = pm.getLaunchIntentForPackage(pacote)
+                if (i != null) {
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ctx.startActivity(i)
+                    return "abrindo " + pm.getApplicationLabel(pm.getApplicationInfo(pacote, 0)) + ", senhor."
+                }
+            }
+        }
+
+        // 2) busca inteligente nos apps instalados (rótulo e pacote, sem acento, nos dois sentidos)
+        data class Cand(val rotulo: String, val pacote: String, val score: Int)
+        val candidatos = mutableListOf<Cand>()
+        for (pi in pm.getInstalledApplications(0)) {
+            val rotulo = normalizar(pm.getApplicationLabel(pi).toString())
+            val pacote = pi.packageName.lowercase()
+            val score = when {
+                rotulo == alvo || pacote == alvo -> 100
+                rotulo.contains(alvo) || pacote.contains(alvo) -> 70
+                alvo.contains(rotulo) && rotulo.length >= 3 -> 50
+                else -> -1
+            }
+            if (score > 0) candidatos.add(Cand(rotulo, pi.packageName, score))
+        }
+        if (candidatos.isNotEmpty()) {
+            val melhor = candidatos.sortedWith(
+                compareByDescending<Cand> { it.score }.thenBy { it.rotulo.length }
+            ).first()
+            val i = pm.getLaunchIntentForPackage(melhor.pacote)
+                ?: return "'" + melhor.rotulo + "' não tem tela pra abrir, senhor."
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.startActivity(i)
+            return "abrindo " + melhor.rotulo + ", senhor."
+        }
+        return "não achei app chamado '" + nome + "', senhor. Tente o nome que aparece na gaveta de apps."
     }
+
+    /** Minúsculas e sem acento: 'Câmera' → 'camera'. */
+    private fun normalizar(t: String): String =
+        java.text.Normalizer.normalize(t.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace("\p{Mn}+".toRegex(), "")
+            .trim()
+
+    /** Apelidos que o povo usa → pacote oficial (buscados na ordem). */
+    private val APELIDOS_APPS: List<Pair<String, String>> = listOf(
+        "email" to "com.google.android.gm",
+        "gmail" to "com.google.android.gm",
+        "e-mail" to "com.google.android.gm",
+        "whatsapp" to "com.whatsapp",
+        "zap" to "com.whatsapp",
+        "whats" to "com.whatsapp",
+        "youtube" to "com.google.android.youtube",
+        "instagram" to "com.instagram.android",
+        "insta" to "com.instagram.android",
+        "facebook" to "com.katana",
+        "navegador" to "com.android.chrome",
+        "chrome" to "com.android.chrome",
+        "internet" to "com.android.chrome",
+        "maps" to "com.google.android.apps.maps",
+        "mapa" to "com.google.android.apps.maps",
+        "gps" to "com.google.android.apps.maps",
+        "waze" to "com.waze",
+        "agenda" to "com.google.android.calendar",
+        "calendario" to "com.google.android.calendar",
+        "relogio" to "com.google.android.deskclock",
+        "alarme" to "com.google.android.deskclock",
+        "calculadora" to "com.google.android.calculator",
+        "telefone" to "com.android.dialer",
+        "ligacoes" to "com.android.dialer",
+        "discador" to "com.android.dialer",
+        "contatos" to "com.android.contacts",
+        "play store" to "com.android.vending",
+        "playstore" to "com.android.vending",
+        "fotos" to "com.google.android.apps.photos",
+        "galeria" to "com.google.android.apps.photos",
+        "spotify" to "com.spotify.music",
+        "mensagens" to "com.google.android.apps.messaging",
+        "sms" to "com.google.android.apps.messaging",
+        "configuracoes" to "com.android.settings",
+        "ajustes" to "com.android.settings",
+        "drive" to "com.google.android.apps.docs",
+        "tiktok" to "com.zhiliaoapp.musically"
+    )
 
     private fun definirTimer(ctx: Context, args: JSONObject): String {
         val min = args.optInt("minutos", -1)
@@ -339,10 +417,15 @@ object JarvisPhoneTools {
             .putExtra(Intent.EXTRA_SUBJECT, args.optString("assunto"))
             .putExtra(Intent.EXTRA_TEXT, args.optString("corpo"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ctx.startActivity(intent)
+        try {
+            ctx.startActivity(intent)
+        } catch (e: Exception) {
+            // sem app de email associado ao mailto: oferece o seletor do sistema
+            ctx.startActivity(Intent.createChooser(intent, "Escolha o app de email").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
         "email pronto pro senhor conferir e enviar."
     } catch (e: Exception) {
-        "falha ao abrir o email: ${e.message ?: "sem detalhes"}"
+        "não achei app de email, senhor — tente pedir 'abrir email' que eu abro o Gmail."
     }
 
 }
