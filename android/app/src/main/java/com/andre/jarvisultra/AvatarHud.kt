@@ -75,7 +75,7 @@ fun AvatarHud(
             // ---- piscadas naturais (nunca enquanto dorme) ----
             val dormindo = !isSpeaking && !isThinking && !isListening
             if (!dormindo && Random.nextFloat() < 0.010f) { blink = 0f; delay(110); blink = 1f }
-            lidDrop += ((if (dormindo) 0.72f else 0f) - lidDrop) * 0.06f
+            lidDrop += ((if (dormindo) 0.55f else 0f) - lidDrop) * 0.06f
 
             // ---- olhar: fixações por estado ----
             if (Random.nextFloat() < 0.03f) {
@@ -83,7 +83,7 @@ fun AvatarHud(
                     isThinking -> { lookX = -0.55f + Random.nextFloat() * 0.35f; lookY = -0.45f + Random.nextFloat() * 0.5f }
                     isListening -> { lookX = Random.nextFloat() * 0.22f - 0.11f; lookY = Random.nextFloat() * 0.2f - 0.08f }
                     isSpeaking -> { lookX = Random.nextFloat() * 0.3f - 0.15f; lookY = Random.nextFloat() * 0.12f - 0.04f }
-                    else -> { lookX = 0.1f; lookY = 0.12f }
+                    else -> { lookX = 0.05f; lookY = 0.02f }
                 }
             }
             // ---- sobrancelhas acompanham ----
@@ -91,7 +91,7 @@ fun AvatarHud(
                 isListening -> 0.6f
                 isThinking -> 0.35f
                 isSpeaking -> 0.45f
-                else -> -0.25f
+                else -> 0.15f   // descanso: levemente erguido — bem-disposto, não abatido
             }
             browRaise += (alvoBrow - browRaise) * 0.12f
 
@@ -111,11 +111,11 @@ fun AvatarHud(
                 alvoW = f.largura; alvoOpen = f.abertura; alvoRound = f.arredonda; alvoCorner = f.canto
                 if (v == "AA" || v == "EH" || v == "OH") nod = 1f   // tônica: aceno
             } else if (isSpeaking) {
-                alvoW = 0.32f; alvoOpen = 0.4f + 0.3f * abs(sin(t * 8f)); alvoRound = 0.2f; alvoCorner = 0.05f
+                alvoW = 0.32f; alvoOpen = 0.4f + 0.3f * abs(sin(t * 8f)); alvoRound = 0.2f; alvoCorner = 0.30f
             } else if (isThinking) {
-                alvoW = 0.28f; alvoOpen = 0.05f + 0.03f * sin(t * 2.2f); alvoRound = 0.1f; alvoCorner = 0.1f
+                alvoW = 0.28f; alvoOpen = 0.05f + 0.03f * sin(t * 2.2f); alvoRound = 0.1f; alvoCorner = 0.18f
             } else {
-                alvoW = 0.30f; alvoOpen = 0.012f; alvoRound = 0f; alvoCorner = 0f
+                alvoW = 0.30f; alvoOpen = 0.012f; alvoRound = 0f; alvoCorner = 0.30f   // sorriso leve
             }
             mW += (alvoW - mW) * 0.45f
             mOpen += (alvoOpen - mOpen) * 0.45f
@@ -128,7 +128,7 @@ fun AvatarHud(
 
     val Cyan = Color(0xFF00E5C7)
     val CyanDim = Cyan.copy(alpha = 0.5f)
-    val glow = Cyan.copy(alpha = if (isSpeaking || isListening) 0.16f else if (isThinking) 0.12f else 0.07f)
+    val glow = Cyan.copy(alpha = if (isSpeaking || isListening) 0.16f else if (isThinking) 0.12f else 0.10f)
 
     Canvas(modifier = modifier) {
         val w = size.width
@@ -216,12 +216,14 @@ fun AvatarHud(
                     center = Offset(ex + lookX * eyeW * 0.55f, eyeY + lookY * eyeH * 0.7f)
                 )
             }
-            // sobrancelha — acompanha a frase
+            // sobrancelha — arco caloroso: canto EXTERNO sobe, interno fica (era invertido = cara triste)
             val by = eyeY - ry * 0.14f - browRaise * ry * 0.075f + nodY
+            val xOut = ex + lado * eyeW * 1.05f
+            val xIn = ex - lado * eyeW * 1.05f
             drawLine(
                 color = Cyan,
-                start = Offset(ex - eyeW * 1.05f, by + lado * browRaise * 2.5f),
-                end = Offset(ex + eyeW * 1.05f, by - lado * browRaise * 2.5f),
+                start = Offset(xOut, by - browRaise * 2.8f),
+                end = Offset(xIn, by - browRaise * 0.8f),
                 strokeWidth = 4f, cap = StrokeCap.Round
             )
         }

@@ -19,14 +19,14 @@ object Visemas {
     data class Forma(val largura: Float, val abertura: Float, val arredonda: Float, val canto: Float)
 
     val FORMAS = mapOf(
-        "MM" to Forma(0.30f, 0.01f, 0.00f, 0.00f),
-        "AA" to Forma(0.28f, 1.00f, 0.15f, -0.10f),
-        "EH" to Forma(0.32f, 0.55f, 0.05f, 0.10f),
-        "IH" to Forma(0.34f, 0.26f, 0.00f, 0.25f),
-        "OH" to Forma(0.18f, 0.80f, 0.85f, 0.00f),
-        "UH" to Forma(0.15f, 0.40f, 0.90f, 0.00f),
-        "FF" to Forma(0.29f, 0.16f, 0.10f, 0.15f),
-        "SS" to Forma(0.22f, 0.08f, 0.00f, 0.20f)
+        "MM" to Forma(0.30f, 0.01f, 0.00f, 0.30f),   // descanso: sorriso leve
+        "AA" to Forma(0.28f, 1.00f, 0.15f, 0.15f),   // vogal aberta sorrindo (não triste)
+        "EH" to Forma(0.32f, 0.55f, 0.05f, 0.25f),
+        "IH" to Forma(0.34f, 0.26f, 0.00f, 0.35f),
+        "OH" to Forma(0.18f, 0.80f, 0.85f, 0.12f),
+        "UH" to Forma(0.15f, 0.40f, 0.90f, 0.10f),
+        "FF" to Forma(0.29f, 0.16f, 0.10f, 0.30f),
+        "SS" to Forma(0.22f, 0.08f, 0.00f, 0.35f)
     )
 
     private val TRANSLIT = mapOf(
