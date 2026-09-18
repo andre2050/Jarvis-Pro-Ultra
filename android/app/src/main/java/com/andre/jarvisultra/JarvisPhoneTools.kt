@@ -317,7 +317,7 @@ object JarvisPhoneTools {
     /** Minúsculas e sem acento: 'Câmera' → 'camera'. */
     private fun normalizar(t: String): String =
         java.text.Normalizer.normalize(t.lowercase(), java.text.Normalizer.Form.NFD)
-            .replace("\p{Mn}+".toRegex(), "")
+            .replace("\\p{Mn}+".toRegex(), "")
             .trim()
 
     /** Apelidos que o povo usa → pacote oficial (buscados na ordem). */
