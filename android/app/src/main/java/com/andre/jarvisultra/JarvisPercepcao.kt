@@ -127,7 +127,8 @@ object JarvisPercepcao {
             val vol = am.getStreamVolume(AudioManager.STREAM_MUSIC)
             val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val energia = if (charging) "carregando" else "na bateria"
-            "Contexto do aparelho AGORA: são $hora, bateria em $pct% ($energia), volume multimídia $vol de $maxVol."
+            val nome = SettingsStore.getUserName(ctx).ifBlank { "senhor" }
+            "Contexto do aparelho AGORA: são $hora, bateria em $pct% ($energia), volume multimídia $vol de $maxVol. O usuário se chama $nome."
         } catch (e: Exception) { "" }
     }
 

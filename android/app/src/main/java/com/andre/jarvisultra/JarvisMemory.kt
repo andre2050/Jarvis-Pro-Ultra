@@ -78,6 +78,31 @@ object JarvisMemory {
     }
 
     /** Registra toda interação (mensagem ou tool) pra alimentar a previsão de hábitos. */
+    /** Painel de transparência: TODAS as memórias com id e data. */
+    fun all(ctx: Context): List<Triple<Int, String, Long>> {
+        ensure(ctx)
+        val d = db(ctx)
+        val out = mutableListOf<Triple<Int, String, Long>>()
+        val c = d.rawQuery("SELECT id, text, created_at FROM memories ORDER BY created_at DESC", null)
+        while (c.moveToNext()) out.add(Triple(c.getInt(0), c.getString(1), c.getLong(2)))
+        c.close(); d.close()
+        return out
+    }
+
+    fun deleteById(ctx: Context, id: Int) {
+        ensure(ctx)
+        val d = db(ctx)
+        d.execSQL("DELETE FROM memories WHERE id=?", arrayOf(id))
+        d.close()
+    }
+
+    fun deleteAll(ctx: Context) {
+        ensure(ctx)
+        val d = db(ctx)
+        d.execSQL("DELETE FROM memories")
+        d.close()
+    }
+
     /** Últimos fatos guardados (pra "o que você sabe de mim"). */
     fun recent(ctx: Context, limit: Int = 10): List<String> {
         ensure(ctx)

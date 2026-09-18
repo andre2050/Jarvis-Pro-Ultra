@@ -12,6 +12,9 @@ object SettingsStore {
     private const val KEY_VOICE = "voice_enabled"
     private const val KEY_TTS_RATE = "tts_rate"
     private const val KEY_THEME = "hud_theme"
+    private const val KEY_USER_NAME = "user_name"
+    private const val KEY_ASSISTANT_NAME = "assistant_name"
+    private const val KEY_AVATAR_INTRO = "v48_avatar_intro"
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -33,11 +36,35 @@ object SettingsStore {
         prefs(ctx).edit().putFloat(KEY_TTS_RATE, rate).apply()
     }
 
-    /** Tema do holograma: "radar" (padrão, edição desktop v5.1) ou "arc" (clássico vermelho). */
-    fun getTheme(ctx: Context): String = prefs(ctx).getString(KEY_THEME, "radar") ?: "radar"
+    /** Tema do holograma: "avatar" (rosto com dublagem, v4.8.0), "radar" ou "arc". */
+    fun getTheme(ctx: Context): String {
+        val t = prefs(ctx).getString(KEY_THEME, "avatar") ?: "avatar"
+        return if (t in listOf("avatar", "radar", "arc")) t else "radar"
+    }
 
     fun setTheme(ctx: Context, tema: String) {
-        prefs(ctx).edit().putString(KEY_THEME, if (tema == "arc") "arc" else "radar").apply()
+        val t = if (tema in listOf("avatar", "radar", "arc")) tema else "radar"
+        prefs(ctx).edit().putString(KEY_THEME, t).apply()
+    }
+
+    /** Personalização (v4.8.0): nome do usuário e do assistente. */
+    fun getUserName(ctx: Context): String = prefs(ctx).getString(KEY_USER_NAME, "") ?: ""
+
+    fun setUserName(ctx: Context, nome: String) {
+        prefs(ctx).edit().putString(KEY_USER_NAME, nome.trim()).apply()
+    }
+
+    fun getAssistantName(ctx: Context): String = prefs(ctx).getString(KEY_ASSISTANT_NAME, "JARVIS") ?: "JARVIS"
+
+    fun setAssistantName(ctx: Context, nome: String) {
+        prefs(ctx).edit().putString(KEY_ASSISTANT_NAME, nome.trim().ifBlank { "JARVIS" }).apply()
+    }
+
+    /** Migração única v4.8.0: apresenta o avatar a quem usava o radar. */
+    fun avatarIntroDone(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_AVATAR_INTRO, false)
+
+    fun markAvatarIntro(ctx: Context) {
+        prefs(ctx).edit().putBoolean(KEY_AVATAR_INTRO, true).apply()
     }
 
     fun hasApiKey(ctx: Context): Boolean = getApiKey(ctx).length >= 20

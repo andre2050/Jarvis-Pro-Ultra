@@ -106,6 +106,19 @@ fun JarvisApp() {
     var suggestion by remember { mutableStateOf<JarvisMemory.Suggestion?>(null) }
     var handsFree by remember { mutableStateOf("off") }
     var tema by remember { mutableStateOf(SettingsStore.getTheme(ctx)) }
+    var speakingText by remember { mutableStateOf<String?>(null) }
+    var lastSpoken by remember { mutableStateOf("") }
+
+    // v4.8.0: apresenta o avatar a quem usava o radar (uma única vez)
+    LaunchedEffect(Unit) {
+        if (SettingsStore.getTheme(ctx) == "radar" && !SettingsStore.avatarIntroDone(ctx)) {
+            SettingsStore.setTheme(ctx, "avatar")
+            SettingsStore.markAvatarIntro(ctx)
+            tema = "avatar"
+        }
+    }
+    // dublagem: libera o rosto quando a voz termina
+    LaunchedEffect(isSpeaking) { if (!isSpeaking) speakingText = null }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
     // --- VISÃO COMPUTACIONAL v4.5.0 ---
     var pendingFacing by remember { mutableStateOf(androidx.camera.core.CameraSelector.LENS_FACING_BACK) }
@@ -179,7 +192,7 @@ fun JarvisApp() {
             isThinking = false
             val reply = result.reply.ifBlank { "Às ordens, senhor." }
             messages = messages.dropLast(1) + ChatMessage("model", reply)
-            if (!reply.startsWith("⚠️")) voice.speak(reply)
+            if (!reply.startsWith("⚠️")) say(reply)
             listState.animateScrollToItem(messages.size - 1)
         }
     }
@@ -221,6 +234,13 @@ fun JarvisApp() {
         onDispose { JarvisVisao.onCaptureRequest = null }
     }
 
+    /** Fala com dublagem real: agenda os visemas no rosto e guarda a cauda anti-eco. */
+    fun say(texto: String) {
+        lastSpoken = texto
+        speakingText = texto
+        voice.speak(texto)
+    }
+
     fun send(forced: String? = null) {
         val msg = (forced ?: input).trim()
         suggestion = null
@@ -242,7 +262,7 @@ fun JarvisApp() {
             isThinking = false
             val reply = result.reply.ifBlank { "Às ordens, senhor." }
             messages = messages.dropLast(1) + ChatMessage("model", reply)
-            if (!reply.startsWith("⚠️")) voice.speak(reply)
+            if (!reply.startsWith("⚠️")) say(reply)
             listState.animateScrollToItem(messages.size - 1)
         }
     }
@@ -297,7 +317,17 @@ fun JarvisApp() {
                     Spacer(Modifier.height(8.dp))
                     StatChip(label = "VOZ", value = if (handsFree == "on") "ON" else "OFF")
                 }
-                if (tema == "radar") {
+                if (tema == "avatar") {
+                    AvatarHud(
+                        modifier = Modifier
+                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
+                            .size(190.dp),
+                        isSpeaking = isSpeaking,
+                        isThinking = isThinking,
+                        isListening = (handsFree == "on"),
+                        speakText = speakingText
+                    )
+                } else if (tema == "radar") {
                     RadarHud(
                         modifier = Modifier
                             .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
@@ -503,8 +533,12 @@ fun JarvisApp() {
                         fun startSession() {
                             try {
                                 voskSession = JarvisVosk.Session(ctx,
-                                    onCommand = { txt -> mainHandler.post { send(txt) } },
-                                    onWake = { mainHandler.post { voice.speak("Pois não, senhor?") } },
+                                    onCommand = { txt -> mainHandler.post {
+                    if (Visemas.ehEco(txt, lastSpoken)) {
+                        messages = messages + ChatMessage("model", "(eco da minha própria voz captado pelo microfone — descartado, senhor.)")
+                    } else send(txt)
+                } },
+                                    onWake = { mainHandler.post { say("Pois não, senhor?") } },
                                     onState = { s -> mainHandler.post { handsFree = s } })
                                 voskSession?.start()
                                 handsFree = "on"
@@ -605,17 +639,63 @@ fun JarvisApp() {
                     }
 
                     Spacer(Modifier.height(16.dp))
-                    Text("TEMA DO HOLOGRAMA", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Text("ROSTO DO HOLOGRAMA", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
                     Spacer(Modifier.height(6.dp))
-                    Text("O radar holográfico teal da edição desktop v5.1 — ou o Reator de Arco vermelho clássico. Troca na hora, sem reiniciar.", fontSize = 12.sp)
+                    Text("AVATAR: rosto humano com dublagem real — a boca se articula com o que ele fala, sobrancelhas e olhar acompanham. Ou os clássicos Radar e Reator de Arco. Troca na hora.", fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
                     Row {
                         TextButton(onClick = {
+                            SettingsStore.setTheme(ctx, "avatar"); tema = "avatar"
+                        }) { Text(if (tema == "avatar") "\u25cf Avatar (ativo)" else "Avatar", fontSize = 12.sp, color = if (tema == "avatar") Cyan else Color.Unspecified) }
+                        TextButton(onClick = {
                             SettingsStore.setTheme(ctx, "radar"); tema = "radar"
-                        }) { Text(if (tema == "radar") "\u25cf Radar (ativo)" else "Radar", fontSize = 12.sp, color = if (tema == "radar") Cyan else Color.Unspecified) }
+                        }) { Text(if (tema == "radar") "\u25cf Radar" else "Radar", fontSize = 12.sp, color = if (tema == "radar") Cyan else Color.Unspecified) }
                         TextButton(onClick = {
                             SettingsStore.setTheme(ctx, "arc"); tema = "arc"
-                        }) { Text(if (tema == "arc") "\u25cf Reator de Arco (ativo)" else "Reator de Arco", fontSize = 12.sp, color = if (tema == "arc") Cyan else Color.Unspecified) }
+                        }) { Text(if (tema == "arc") "\u25cf Reator" else "Reator", fontSize = 12.sp, color = if (tema == "arc") Cyan else Color.Unspecified) }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("PERSONALIZAÇÃO", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    var seuNome by remember { mutableStateOf(SettingsStore.getUserName(ctx)) }
+                    var nomeJarvis by remember { mutableStateOf(SettingsStore.getAssistantName(ctx)) }
+                    OutlinedTextField(value = seuNome, onValueChange = { seuNome = it },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("seu nome — como devo te chamar?") })
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = nomeJarvis, onValueChange = { nomeJarvis = it },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("meu nome (padrão: JARVIS)") })
+                    Spacer(Modifier.height(2.dp))
+                    TextButton(onClick = {
+                        SettingsStore.setUserName(ctx, seuNome)
+                        SettingsStore.setAssistantName(ctx, nomeJarvis)
+                    }) { Text("salvar nomes", fontSize = 12.sp) }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("MEMÓRIAS — TUDO QUE SEI SOBRE VOCÊ", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Transparência total: apague qualquer memória com um toque.", fontSize = 12.sp)
+                    var memList by remember { mutableStateOf(JarvisMemory.all(ctx)) }
+                    if (memList.isEmpty()) {
+                        Text("(nenhuma memória guardada ainda — peça 'lembre que…')", fontSize = 12.sp, color = CyanDim)
+                    }
+                    memList.forEach { (id, texto, ts) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text("\u2022 " + texto + "\n  " + java.text.SimpleDateFormat("dd/MM HH:mm").format(java.util.Date(ts)),
+                                fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                JarvisMemory.deleteById(ctx, id)
+                                memList = JarvisMemory.all(ctx)
+                            }) { Text("\u2716", fontSize = 12.sp, color = Color(0xFFFF5A4D)) }
+                        }
+                    }
+                    if (memList.isNotEmpty()) {
+                        TextButton(onClick = {
+                            JarvisMemory.deleteAll(ctx)
+                            memList = JarvisMemory.all(ctx)
+                        }) { Text("apagar TODAS as memórias", fontSize = 12.sp, color = Color(0xFFFF5A4D)) }
                     }
 
                     Spacer(Modifier.height(16.dp))
