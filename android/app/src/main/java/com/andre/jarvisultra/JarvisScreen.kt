@@ -166,6 +166,13 @@ fun JarvisApp() {
     }
 
     // --- VISÃO: análise da foto capturada (multimodal no Gemini) ---
+    /** Fala com dublagem real: agenda os visemas no rosto e guarda a cauda anti-eco. */
+    fun say(texto: String) {
+        lastSpoken = texto
+        speakingText = texto
+        voice.speak(texto)
+    }
+
     fun analisarFoto(uri: Uri) {
         if (isThinking) return
         if (!apiKeySaved) {
@@ -195,13 +202,6 @@ fun JarvisApp() {
             if (!reply.startsWith("⚠️")) say(reply)
             listState.animateScrollToItem(messages.size - 1)
         }
-    }
-
-    /** Fala com dublagem real: agenda os visemas no rosto e guarda a cauda anti-eco. */
-    fun say(texto: String) {
-        lastSpoken = texto
-        speakingText = texto
-        voice.speak(texto)
     }
 
     val cameraActivity = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
