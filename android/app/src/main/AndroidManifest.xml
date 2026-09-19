@@ -18,6 +18,13 @@
     <!-- Percepção Total v4.0.0 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Presença 24h + Briefing matinal (v4.9.0) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -70,5 +77,35 @@
             <action android:name="android.service.notification.NotificationListenerService" />
         </intent-filter>
     </service>
+
+    <!-- Presença 24h (v4.9.0): wake word com app em segundo plano -->
+    <service
+        android:name=".JarvisWakeService"
+        android:exported="false"
+        android:foregroundServiceType="microphone" />
+
+    <!-- Briefing matinal (v4.9.0) -->
+    <receiver android:name=".JarvisBriefingReceiver" android:exported="false" />
+    <service
+        android:name=".JarvisBriefingService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback" />
+
+    <!-- Rearme automático após reiniciar o aparelho -->
+    <receiver android:name=".JarvisBootReceiver" android:exported="false">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+        </intent-filter>
+    </receiver>
+
+    <!-- Widget do radar/busto na tela inicial -->
+    <receiver android:name=".JarvisWidget" android:exported="false">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/jarvis_widget_info" />
+    </receiver>
 </application>
 </manifest>

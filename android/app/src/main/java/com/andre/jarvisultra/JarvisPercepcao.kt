@@ -178,7 +178,7 @@ object JarvisPercepcao {
 
     // ---------- clima ----------
 
-    private fun clima(ctx: Context): String {
+    fun clima(ctx: Context): String {
         val loc = ultimaLocalizacao(ctx)
             ?: return "sem permissão de localização, senhor — autorize nas permissões do app que eu vejo o clima da sua região."
         val (lat, lon) = loc

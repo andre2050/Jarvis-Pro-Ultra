@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#030810">
+    <ImageView
+        android:id="@+id/iv_radar"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Holograma do JARVIS — toque para chamar"
+        android:scaleType="fitCenter" />
+</FrameLayout>

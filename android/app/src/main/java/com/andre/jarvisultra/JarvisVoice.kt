@@ -53,6 +53,16 @@ class JarvisVoice(ctx: Context) {
         speakNow(text, id)
     }
 
+    /** v4.9.0: fala imediata (briefing matinal) — ignora o toggle de voz do chat. */
+    fun speakNow(text: String) {
+        if (text.isBlank()) return
+        val id = "jarvis-${System.nanoTime()}"
+        pending[id] = text
+        speakNow(text, id)
+    }
+
+    val isSpeaking: Boolean get() = tts?.isSpeaking == true || pending.isNotEmpty()
+
     private fun speakNow(text: String, id: String) {
         val t = tts ?: return
         if (t.isSpeaking) {

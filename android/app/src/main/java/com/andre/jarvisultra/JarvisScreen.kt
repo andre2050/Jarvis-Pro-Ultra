@@ -56,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -331,12 +332,21 @@ fun JarvisApp() {
                         isThinking = isThinking,
                         isListening = (handsFree == "on")
                     )
-                } else {
+                } else if (tema == "arc") {
                     ArcReactorHud(
                         modifier = Modifier
                             .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
                             .size(190.dp),
                         ctx = ctx,
+                        isSpeaking = isSpeaking,
+                        isThinking = isThinking,
+                        isListening = (handsFree == "on")
+                    )
+                } else {
+                    HologramBustHud(
+                        modifier = Modifier
+                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
+                            .size(190.dp),
                         isSpeaking = isSpeaking,
                         isThinking = isThinking,
                         isListening = (handsFree == "on")
@@ -610,6 +620,54 @@ fun JarvisApp() {
                         TextButton(onClick = {
                             SettingsStore.setTheme(ctx, "arc"); tema = "arc"
                         }) { Text(if (tema == "arc") "\u25cf Reator" else "Reator", fontSize = 12.sp, color = if (tema == "arc") Cyan else Color.Unspecified) }
+                        TextButton(onClick = {
+                            SettingsStore.setTheme(ctx, "buster"); tema = "buster"
+                        }) { Text(if (tema == "buster") "\u25cf Busto" else "Busto", fontSize = 12.sp, color = if (tema == "buster") Cyan else Color.Unspecified) }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("PRESENÇA 24H", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("O JARVIS escuta \"Jarvis\" com o app em segundo plano — celular na mesa, no bolso, tela apagada. Escuta local, offline, dentro do que a bateria permitir.", fontSize = 12.sp)
+                    var presenca24h by remember { mutableStateOf(SettingsStore.getWake24h(ctx)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = presenca24h, onCheckedChange = { on ->
+                            presenca24h = on
+                            SettingsStore.setWake24h(ctx, on)
+                            if (on) {
+                                if (!JarvisVosk.hasModel(ctx)) {
+                                    Thread { JarvisVosk.ensureModel(ctx) { }; mainHandler.post { JarvisWakeService.ligar(ctx) } }.start()
+                                } else JarvisWakeService.ligar(ctx)
+                            } else JarvisWakeService.desligar(ctx)
+                        })
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (presenca24h) "ligado — de prontidão" else "desligado", fontSize = 12.sp)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("BRIEFING MATINAL", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Todo dia, no horário marcado, ele fala sozinho: bom dia, hora, clima da sua região, bateria e o que lembra de você.", fontSize = 12.sp)
+                    var briefingOn by remember { mutableStateOf(SettingsStore.getBriefingOn(ctx)) }
+                    var briefingHora by remember { mutableStateOf(SettingsStore.getBriefingHora(ctx)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = briefingOn, onCheckedChange = { on ->
+                            briefingOn = on
+                            SettingsStore.setBriefingOn(ctx, on)
+                            if (on) BriefingScheduler.agendar(ctx) else BriefingScheduler.cancelar(ctx)
+                        })
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = briefingHora, onValueChange = { v ->
+                                briefingHora = v
+                                if (Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(v)) {
+                                    SettingsStore.setBriefingHora(ctx, v)
+                                    if (briefingOn) BriefingScheduler.agendar(ctx)
+                                }
+                            },
+                            singleLine = true, modifier = Modifier.width(90.dp),
+                            placeholder = { Text("08:00") }
+                        )
                     }
 
                     Spacer(Modifier.height(16.dp))

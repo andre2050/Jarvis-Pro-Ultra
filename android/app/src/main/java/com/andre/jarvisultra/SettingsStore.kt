@@ -15,6 +15,9 @@ object SettingsStore {
     private const val KEY_USER_NAME = "user_name"
     private const val KEY_ASSISTANT_NAME = "assistant_name"
     private const val KEY_AVATAR_INTRO = "v48_avatar_intro"
+    private const val KEY_WAKE_24H = "wake24h_enabled"
+    private const val KEY_BRIEFING_ON = "briefing_enabled"
+    private const val KEY_BRIEFING_HORA = "briefing_hora"
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -36,14 +39,16 @@ object SettingsStore {
         prefs(ctx).edit().putFloat(KEY_TTS_RATE, rate).apply()
     }
 
-    /** Tema do holograma: "avatar" (rosto com dublagem, v4.8.0), "radar" ou "arc". */
+    private val TEMAS = listOf("avatar", "radar", "arc", "buster")
+
+    /** Tema do holograma: "avatar" (rosto com dublagem), "radar", "arc" (reator) ou "buster" (busto holográfico wireframe, v4.9.0). */
     fun getTheme(ctx: Context): String {
         val t = prefs(ctx).getString(KEY_THEME, "avatar") ?: "avatar"
-        return if (t in listOf("avatar", "radar", "arc")) t else "radar"
+        return if (t in TEMAS) t else "radar"
     }
 
     fun setTheme(ctx: Context, tema: String) {
-        val t = if (tema in listOf("avatar", "radar", "arc")) tema else "radar"
+        val t = if (tema in TEMAS) tema else "radar"
         prefs(ctx).edit().putString(KEY_THEME, t).apply()
     }
 
@@ -68,4 +73,25 @@ object SettingsStore {
     }
 
     fun hasApiKey(ctx: Context): Boolean = getApiKey(ctx).length >= 20
+
+    // ---- Presença 24h (v4.9.0): wake word com o app em segundo plano ----
+    fun getWake24h(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_WAKE_24H, false)
+
+    fun setWake24h(ctx: Context, v: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_WAKE_24H, v).apply()
+    }
+
+    // ---- Briefing matinal (v4.9.0) ----
+    fun getBriefingOn(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_BRIEFING_ON, false)
+
+    fun setBriefingOn(ctx: Context, v: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_BRIEFING_ON, v).apply()
+    }
+
+    /** Horário no formato "HH:mm", padrão 08:00. */
+    fun getBriefingHora(ctx: Context): String = prefs(ctx).getString(KEY_BRIEFING_HORA, "08:00") ?: "08:00"
+
+    fun setBriefingHora(ctx: Context, hora: String) {
+        prefs(ctx).edit().putString(KEY_BRIEFING_HORA, hora).apply()
+    }
 }
