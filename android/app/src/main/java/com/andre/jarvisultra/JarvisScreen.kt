@@ -105,18 +105,9 @@ fun JarvisApp() {
     var testResult by remember { mutableStateOf<String?>(null) }
     var voiceWork by remember { mutableStateOf<String?>(null) }
     var handsFree by remember { mutableStateOf("off") }
-    var tema by remember { mutableStateOf(SettingsStore.getTheme(ctx)) }
     var speakingText by remember { mutableStateOf<String?>(null) }
     var lastSpoken by remember { mutableStateOf("") }
 
-    // v4.8.0: apresenta o avatar a quem usava o radar (uma única vez)
-    LaunchedEffect(Unit) {
-        if (SettingsStore.getTheme(ctx) == "radar" && !SettingsStore.avatarIntroDone(ctx)) {
-            SettingsStore.setTheme(ctx, "avatar")
-            SettingsStore.markAvatarIntro(ctx)
-            tema = "avatar"
-        }
-    }
     // dublagem: libera o rosto quando a voz termina
     LaunchedEffect(isSpeaking) { if (!isSpeaking) speakingText = null }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
@@ -312,46 +303,14 @@ fun JarvisApp() {
                     Spacer(Modifier.height(8.dp))
                     StatChip(label = "VOZ", value = if (handsFree == "on") "ON" else "OFF")
                 }
-                if (tema == "avatar") {
-                    AvatarHud(
-                        modifier = Modifier
-                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
-                            .size(190.dp),
-                        isSpeaking = isSpeaking,
-                        isThinking = isThinking,
-                        isListening = (handsFree == "on"),
-                        speakText = speakingText
-                    )
-                } else if (tema == "radar") {
-                    RadarHud(
-                        modifier = Modifier
-                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
-                            .size(190.dp),
-                        ctx = ctx,
-                        isSpeaking = isSpeaking,
-                        isThinking = isThinking,
-                        isListening = (handsFree == "on")
-                    )
-                } else if (tema == "arc") {
-                    ArcReactorHud(
-                        modifier = Modifier
-                            .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
-                            .size(190.dp),
-                        ctx = ctx,
-                        isSpeaking = isSpeaking,
-                        isThinking = isThinking,
-                        isListening = (handsFree == "on")
-                    )
-                } else {
-                    HologramBustHud(
+                HologramBustHud(
                         modifier = Modifier
                             .padding(top = 8.dp, bottom = 4.dp, start = 6.dp, end = 6.dp)
                             .size(190.dp),
                         isSpeaking = isSpeaking,
                         isThinking = isThinking,
                         isListening = (handsFree == "on")
-                    )
-                }
+                )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     StatChip(label = "NET", value = netStatus(ctx))
                     Spacer(Modifier.height(8.dp))
@@ -603,26 +562,6 @@ fun JarvisApp() {
                     }) { Text("Testar chave", fontSize = 12.sp) }
                     testResult?.let { tr ->
                         Text(tr, fontSize = 12.sp, color = Cyan)
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-                    Text("ROSTO DO HOLOGRAMA", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(6.dp))
-                    Text("AVATAR: rosto humano com dublagem real — a boca se articula com o que ele fala, sobrancelhas e olhar acompanham. Ou os clássicos Radar e Reator de Arco. Troca na hora.", fontSize = 12.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Row {
-                        TextButton(onClick = {
-                            SettingsStore.setTheme(ctx, "avatar"); tema = "avatar"
-                        }) { Text(if (tema == "avatar") "\u25cf Avatar (ativo)" else "Avatar", fontSize = 12.sp, color = if (tema == "avatar") Cyan else Color.Unspecified) }
-                        TextButton(onClick = {
-                            SettingsStore.setTheme(ctx, "radar"); tema = "radar"
-                        }) { Text(if (tema == "radar") "\u25cf Radar" else "Radar", fontSize = 12.sp, color = if (tema == "radar") Cyan else Color.Unspecified) }
-                        TextButton(onClick = {
-                            SettingsStore.setTheme(ctx, "arc"); tema = "arc"
-                        }) { Text(if (tema == "arc") "\u25cf Reator" else "Reator", fontSize = 12.sp, color = if (tema == "arc") Cyan else Color.Unspecified) }
-                        TextButton(onClick = {
-                            SettingsStore.setTheme(ctx, "buster"); tema = "buster"
-                        }) { Text(if (tema == "buster") "\u25cf Busto" else "Busto", fontSize = 12.sp, color = if (tema == "buster") Cyan else Color.Unspecified) }
                     }
 
                     Spacer(Modifier.height(16.dp))

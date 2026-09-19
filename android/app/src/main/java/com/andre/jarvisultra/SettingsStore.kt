@@ -39,17 +39,18 @@ object SettingsStore {
         prefs(ctx).edit().putFloat(KEY_TTS_RATE, rate).apply()
     }
 
-    private val TEMAS = listOf("avatar", "radar", "arc", "buster")
-
-    /** Tema do holograma: "avatar" (rosto com dublagem), "radar", "arc" (reator) ou "buster" (busto holográfico wireframe, v4.9.0). */
+    /**
+     * v4.9.3: UMA ÚNICA SKIN — o Busto Holográfico da referência do senhor.
+     * Qualquer tema antigo (avatar/radar/arc/buster) migra automaticamente.
+     */
     fun getTheme(ctx: Context): String {
-        val t = prefs(ctx).getString(KEY_THEME, "avatar") ?: "avatar"
-        return if (t in TEMAS) t else "radar"
+        val t = prefs(ctx).getString(KEY_THEME, "busto") ?: "busto"
+        if (t != "busto") prefs(ctx).edit().putString(KEY_THEME, "busto").apply()
+        return "busto"
     }
 
     fun setTheme(ctx: Context, tema: String) {
-        val t = if (tema in TEMAS) tema else "radar"
-        prefs(ctx).edit().putString(KEY_THEME, t).apply()
+        prefs(ctx).edit().putString(KEY_THEME, "busto").apply()
     }
 
     /** Personalização (v4.8.0): nome do usuário e do assistente. */

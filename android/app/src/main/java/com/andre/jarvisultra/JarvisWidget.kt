@@ -38,7 +38,7 @@ class JarvisWidget : AppWidgetProvider() {
                 .putExtra("wake", true),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val views = RemoteViews(ctx.packageName, R.layout.widget_jarvis)
-        val bitmap = if (SettingsStore.getTheme(ctx) == "buster") desenharBusto(ctx) else desenharRadar(ctx)
+        val bitmap = desenharBusto(ctx)  // v4.9.3: única skin
         views.setImageViewBitmap(R.id.iv_radar, bitmap)
         views.setOnClickPendingIntent(R.id.iv_radar, tocar)
         for (id in ids) manager.updateAppWidget(id, views)
@@ -154,9 +154,9 @@ class JarvisWidget : AppWidgetProvider() {
             }
             c.drawRect(0f, 0f, w, h, fundo)
 
-            val ice = Color.argb(220, 0xBF, 0xE8, 0xFF)
-            val iceDim = Color.argb(60, 0xBF, 0xE8, 0xFF)
-            val core = Color.argb(255, 0x7F, 0xD6, 0xFF)
+            val ice = Color.argb(230, 0xE0, 0xF7, 0xFA)
+            val iceDim = Color.argb(70, 0xE0, 0xF7, 0xFA)
+            val core = Color.argb(255, 0x64, 0xB5, 0xF6)
 
             val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = iceDim; strokeWidth = 1f }
             var gx = 0f; while (gx < w) { c.drawLine(gx, 0f, gx, h, grid); gx += w / 14f }
@@ -214,9 +214,15 @@ class JarvisWidget : AppWidgetProvider() {
 
             val corePos = cx to (yOmbros * 0.9f + h * 0.03f)
             val nucleo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = core }
-            c.drawCircle(corePos.first, corePos.second, w * 0.06f, nucleo)
-            val brilho = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(90, 0x7F, 0xD6, 0xFF) }
+            val anel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = core; style = Paint.Style.STROKE; strokeWidth = w * 0.008f
+            }
+            val brilho = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(100, 0x64, 0xB5, 0xF6) }
             c.drawCircle(corePos.first, corePos.second, w * 0.13f, brilho)
+            c.drawCircle(corePos.first, corePos.second, w * 0.10f, anel)
+            c.drawCircle(corePos.first, corePos.second, w * 0.075f, anel)
+            c.drawCircle(corePos.first, corePos.second, w * 0.055f, nucleo)
+            c.drawCircle(corePos.first, corePos.second, w * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(235, 0xE0, 0xF7, 0xFA) })
 
             val hora = SimpleDateFormat("HH:mm", Locale("pt", "BR")).format(Date())
             val bateria = try {
