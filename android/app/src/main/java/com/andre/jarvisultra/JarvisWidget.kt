@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -141,88 +142,36 @@ class JarvisWidget : AppWidgetProvider() {
             return bmp
         }
 
-        /** v4.9.0: versão estática do busto holográfico (tema "buster") pro widget. */
+        /**
+         * v4.9.4: o busto QUASE REAL no widget — a mesma arte do app
+         * (res/drawable-nodpi/holo_busto.png) com hora e bateria no rodapé.
+         */
         fun desenharBusto(ctx: Context, lado: Int = 512): Bitmap {
             val bmp = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
             val c = Canvas(bmp)
             val w = lado.toFloat(); val h = lado.toFloat()
             val cx = w / 2f
-            val fundo = Paint().apply {
-                shader = RadialGradient(cx, h * 0.4f, w * 0.7f,
-                    Color.argb(255, 0x05, 0x0C, 0x14), Color.argb(255, 0x02, 0x05, 0x09),
+
+            // fundo
+            c.drawRect(0f, 0f, w, h, Paint().apply {
+                shader = RadialGradient(cx, h * 0.45f, w * 0.8f,
+                    Color.argb(255, 0x06, 0x0C, 0x14), Color.argb(255, 0x02, 0x04, 0x08),
                     Shader.TileMode.CLAMP)
-            }
-            c.drawRect(0f, 0f, w, h, fundo)
+            })
 
-            val ice = Color.argb(230, 0xE0, 0xF7, 0xFA)
-            val iceDim = Color.argb(70, 0xE0, 0xF7, 0xFA)
-            val core = Color.argb(255, 0x64, 0xB5, 0xF6)
+            // a arte quase real
+            try {
+                val arte = BitmapFactory.decodeResource(ctx.resources, R.drawable.holo_busto)
+                c.drawBitmap(arte, null, android.graphics.RectF(0f, 0f, w, h * 0.90f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                arte.recycle()
+            } catch (e: Exception) { /* fallback: fica só o fundo + texto */ }
 
-            val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = iceDim; strokeWidth = 1f }
-            var gx = 0f; while (gx < w) { c.drawLine(gx, 0f, gx, h, grid); gx += w / 14f }
-            var gy = 0f; while (gy < h) { c.drawLine(0f, gy, w, gy, grid); gy += h / 14f }
-
-            val linha = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = ice; style = Paint.Style.STROKE
-                strokeWidth = w * 0.012f; strokeCap = Paint.Cap.ROUND
+            // faixa escura no rodapé pra legibilidade do relógio
+            val fade = Paint().apply {
+                shader = android.graphics.LinearGradient(0f, h * 0.78f, 0f, h,
+                    Color.argb(0, 0, 0, 0), Color.argb(210, 2, 4, 8), Shader.TileMode.CLAMP)
             }
-            val topoCapacete = h * 0.10f
-            val alturaCapacete = h * 0.40f
-            val larguraTesta = w * 0.30f
-            val yTesta = topoCapacete + alturaCapacete * 0.28f
-            val yQueixo = topoCapacete + alturaCapacete
-            val esq = listOf(
-                cx to topoCapacete,
-                cx - larguraTesta * 0.55f to topoCapacete + alturaCapacete * 0.08f,
-                cx - larguraTesta to yTesta,
-                cx - larguraTesta * 0.92f to topoCapacete + alturaCapacete * 0.55f,
-                cx - larguraTesta * 0.62f to topoCapacete + alturaCapacete * 0.80f,
-                cx - larguraTesta * 0.30f to yQueixo
-            )
-            val dir = esq.map { (x, y) -> (cx + (cx - x)) to y }
-            for (lado2 in listOf(esq, dir)) {
-                for (i in 0 until lado2.size - 1) {
-                    c.drawLine(lado2[i].first, lado2[i].second, lado2[i + 1].first, lado2[i + 1].second, linha)
-                }
-            }
-            c.drawLine(esq.last().first, esq.last().second, dir.last().first, dir.last().second, linha)
-
-            val olho = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = core; style = Paint.Style.STROKE
-                strokeWidth = w * 0.02f; strokeCap = Paint.Cap.ROUND
-            }
-            val yOlhos = topoCapacete + alturaCapacete * 0.42f
-            for (sinal in listOf(-1f, 1f)) {
-                val ex = cx + sinal * larguraTesta * 0.42f
-                c.drawLine(ex - w * 0.05f, yOlhos, ex + w * 0.05f, yOlhos, olho)
-            }
-
-            val yOmbros = h * 0.62f
-            val ombroLinha = Paint(linha)
-            val ombroEsq = listOf(
-                cx - larguraTesta * 0.3f to yQueixo,
-                cx - w * 0.92f * 0.22f to yOmbros * 0.86f,
-                cx - w * 0.92f * 0.50f to yOmbros * 0.95f,
-                cx - w * 0.92f * 0.50f to h * 0.96f
-            )
-            val ombroDir = ombroEsq.map { (x, y) -> (cx + (cx - x)) to y }
-            for (lado2 in listOf(ombroEsq, ombroDir)) {
-                for (i in 0 until lado2.size - 1) {
-                    c.drawLine(lado2[i].first, lado2[i].second, lado2[i + 1].first, lado2[i + 1].second, ombroLinha)
-                }
-            }
-
-            val corePos = cx to (yOmbros * 0.9f + h * 0.03f)
-            val nucleo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = core }
-            val anel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = core; style = Paint.Style.STROKE; strokeWidth = w * 0.008f
-            }
-            val brilho = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(100, 0x64, 0xB5, 0xF6) }
-            c.drawCircle(corePos.first, corePos.second, w * 0.13f, brilho)
-            c.drawCircle(corePos.first, corePos.second, w * 0.10f, anel)
-            c.drawCircle(corePos.first, corePos.second, w * 0.075f, anel)
-            c.drawCircle(corePos.first, corePos.second, w * 0.055f, nucleo)
-            c.drawCircle(corePos.first, corePos.second, w * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(235, 0xE0, 0xF7, 0xFA) })
+            c.drawRect(0f, h * 0.78f, w, h, fade)
 
             val hora = SimpleDateFormat("HH:mm", Locale("pt", "BR")).format(Date())
             val bateria = try {
@@ -230,10 +179,10 @@ class JarvisWidget : AppWidgetProvider() {
                 "${bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)}%"
             } catch (e: Exception) { "" }
             val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(230, 0xBF, 0xE8, 0xFF)
-                textSize = h * 0.055f; textAlign = Paint.Align.CENTER; isFakeBoldText = true
+                color = Color.argb(235, 0xE0, 0xF7, 0xFA)
+                textSize = h * 0.052f; textAlign = Paint.Align.CENTER; isFakeBoldText = true
             }
-            c.drawText("$hora  ·  J.A.R.V.I.S  ·  $bateria", cx, h * 0.995f, txt)
+            c.drawText("$hora  ·  J.A.R.V.I.S  ·  $bateria", cx, h * 0.97f, txt)
             return bmp
         }
     }
