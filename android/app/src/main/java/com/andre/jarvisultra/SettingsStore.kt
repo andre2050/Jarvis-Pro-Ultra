@@ -16,6 +16,7 @@ object SettingsStore {
     private const val KEY_ASSISTANT_NAME = "assistant_name"
     private const val KEY_AVATAR_INTRO = "v48_avatar_intro"
     private const val KEY_WAKE_24H = "wake24h_enabled"
+    private const val KEY_AVISO_PRESENCA = "aviso_presenca"
     private const val KEY_BRIEFING_ON = "briefing_enabled"
     private const val KEY_BRIEFING_HORA = "briefing_hora"
 
@@ -80,6 +81,13 @@ object SettingsStore {
 
     fun setWake24h(ctx: Context, v: Boolean) {
         prefs(ctx).edit().putBoolean(KEY_WAKE_24H, v).apply()
+    }
+
+    /** v4.9.9: motivo de a presença não ter conseguido ligar (Android 14 exige
+     * o app visível na tela pra iniciar serviço de microfone). Null = sem pendência. */
+    fun getAvisoPresenca(ctx: Context): String? = prefs(ctx).getString(KEY_AVISO_PRESENCA, null)
+    fun setAvisoPresenca(ctx: Context, msg: String?) {
+        prefs(ctx).edit().putString(KEY_AVISO_PRESENCA, msg).apply()
     }
 
     // ---- Briefing matinal (v4.9.0) ----

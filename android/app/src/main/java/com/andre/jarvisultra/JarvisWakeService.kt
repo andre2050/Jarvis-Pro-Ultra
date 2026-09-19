@@ -36,9 +36,23 @@ class JarvisWakeService : Service() {
         /** tempo mínimo entre dois disparos de wake */
         private const val DEBOUNCE_MS = 10000L
 
-        fun ligar(ctx: Context) {
-            ctx.startForegroundService(
-                Intent(ctx, JarvisWakeService::class.java).setAction(ACTION_START))
+        /** v4.9.9: retorna true se conseguiu pedir a partida (não garante que
+         * o startForeground() interno vá ter sucesso — isso é validado dentro
+         * do onStartCommand, que tem sua própria blindagem). */
+        fun ligar(ctx: Context): Boolean {
+            return try {
+                ctx.startForegroundService(
+                    Intent(ctx, JarvisWakeService::class.java).setAction(ACTION_START))
+                true
+            } catch (e: Exception) {
+                // Android 14: SecurityException/IllegalStateException podem nascer
+                // aqui mesmo se o app não estiver em estado elegível pra FGS de mic
+                SettingsStore.setAvisoPresenca(ctx,
+                    "Não consegui ligar a presença agora, senhor — o Android exige o app " +
+                    "aberto e na tela pra isso. Deixe o JARVIS aberto por alguns segundos e " +
+                    "tente de novo em ⚙ CONFIG.")
+                false
+            }
         }
 
         fun desligar(ctx: Context) {
@@ -61,8 +75,24 @@ class JarvisWakeService : Service() {
             return START_NOT_STICKY
         }
 
-        // START ou recriação do sistema: foreground garantido sempre
-        startForeground(NOTIF_ID, notificacao())
+        // v4.9.9: aqui é onde o crash de verdade nascia — Android 14 valida
+        // NA HORA se o app está em estado elegível pra abrir um serviço de
+        // microfone em primeiro plano (app visível há pouco tempo). Sem o
+        // app na tela (ex.: boot, ou o app saiu de vista enquanto baixava o
+        // modelo), o sistema lança SecurityException AQUI DENTRO — e sem
+        // captura isso derruba o processo sem deixar rastro de exceção Java
+        // "normal" (mata a UncaughtExceptionHandler antes de qualquer log).
+        try {
+            startForeground(NOTIF_ID, notificacao())
+        } catch (e: Exception) {
+            SettingsStore.setAvisoPresenca(this,
+                "A presença não ligou, senhor — o Android bloqueou por eu não estar " +
+                "com o app visível na hora. Abra o JARVIS, deixe a tela acesa por uns " +
+                "segundos e ative de novo em ⚙ CONFIG.")
+            SettingsStore.setWake24h(this, false)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (wakeLock?.isHeld != true) {
             wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jarvis:wake24h").also {

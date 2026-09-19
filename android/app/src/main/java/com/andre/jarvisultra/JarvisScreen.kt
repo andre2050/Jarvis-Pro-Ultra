@@ -132,6 +132,8 @@ fun JarvisApp() {
     val history = remember { JSONArray() }
     // v4.9.6 caixa-preta: se o app fechou sozinho na última vez, mostra o motivo
     var crashReport by remember { mutableStateOf(JarvisUltraApp.lerUltimoCrash(ctx)) }
+    // v4.9.9: aviso de "a presença não conseguiu ligar" (regra do Android 14)
+    var avisoPresenca by remember { mutableStateOf(SettingsStore.getAvisoPresenca(ctx)) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(apiKeySaved) {
@@ -368,6 +370,14 @@ fun JarvisApp() {
     // o app só saúda quando é chamado e processa o comando que o serviço
     // capturou. O app NUNCA abre uma escuta Vosk por cima da presença
     // (era essa disputa que derrubava o app em crash nativo).
+    // v4.9.9: app abriu com a presença marcada como "ligada" nas config,
+    // mas o serviço pode não estar rodando (reboot, ou falha anterior) —
+    // religa sozinho agora que o app está visível (estado elegível).
+    LaunchedEffect(Unit) {
+        if (SettingsStore.getWake24h(ctx)) JarvisWakeService.ligar(ctx)
+        avisoPresenca = SettingsStore.getAvisoPresenca(ctx)
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             if (WakeCoord.wakePendente) {
@@ -652,6 +662,19 @@ fun JarvisApp() {
                 TextButton(onClick = { JarvisUltraApp.apagarCrash(ctx); crashReport = null }) {
                     Text("OK — entendi")
                 }
+            }
+        )
+    }
+    if (avisoPresenca != null) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Presença 24h") },
+            text = { Text(avisoPresenca ?: "", fontSize = 13.sp, color = Color(0xFFE2F3FA)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    SettingsStore.setAvisoPresenca(ctx, null)
+                    avisoPresenca = null
+                }) { Text("OK") }
             }
         )
     }
