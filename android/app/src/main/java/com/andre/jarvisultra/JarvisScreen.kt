@@ -724,22 +724,40 @@ fun JarvisApp() {
                     Spacer(Modifier.height(6.dp))
                     Text("O JARVIS escuta \"Jarvis\" com o app em segundo plano — celular na mesa, no bolso, tela apagada. Escuta local, offline, dentro do que a bateria permitir.", fontSize = 12.sp)
                     var presenca24h by remember { mutableStateOf(SettingsStore.getWake24h(ctx)) }
+
+                    fun ligarPresenca() {
+                        presenca24h = true
+                        SettingsStore.setWake24h(ctx, true)
+                        // v4.9.7: o serviço é o dono único do microfone —
+                        // escuta local do app (se houver) se encerra
+                        try { voskSession?.stop() } catch (_: Exception) { }
+                        voskSession = null
+                        if (handsFree == "on") handsFree = "presença ativa — diga \"Jarvis\""
+                        if (!JarvisVosk.hasModel(ctx)) {
+                            Thread { JarvisVosk.ensureModel(ctx) { }; mainHandler.post { JarvisWakeService.ligar(ctx) } }.start()
+                        } else JarvisWakeService.ligar(ctx)
+                    }
+
+                    // v4.9.10: no Android 14/15/16 o serviço de microfone em
+                    // primeiro plano SÓ inicia com a permissão de microfone
+                    // concedida — sem ela, o sistema recusa com o mesmo erro
+                    // do diagnóstico. A permissão vem PRIMEIRO, a presença depois.
+                    val micPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        if (granted) ligarPresenca()
+                    }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = presenca24h, onCheckedChange = { on ->
-                            presenca24h = on
-                            SettingsStore.setWake24h(ctx, on)
-                            if (on) {
-                                // v4.9.7: o serviço é o dono único do microfone —
-                                // escuta local do app (se houver) se encerra
-                                try { voskSession?.stop() } catch (_: Exception) { }
-                                voskSession = null
-                                if (handsFree == "on") handsFree = "presença ativa — diga \"Jarvis\""
-                                if (!JarvisVosk.hasModel(ctx)) {
-                                    Thread { JarvisVosk.ensureModel(ctx) { }; mainHandler.post { JarvisWakeService.ligar(ctx) } }.start()
-                                } else JarvisWakeService.ligar(ctx)
-                            } else {
+                            if (!on) {
+                                presenca24h = false
+                                SettingsStore.setWake24h(ctx, false)
                                 if (handsFree.startsWith("presença")) handsFree = "off"
                                 JarvisWakeService.desligar(ctx)
+                            } else if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO)
+                                != PackageManager.PERMISSION_GRANTED) {
+                                micPerm.launch(android.Manifest.permission.RECORD_AUDIO)
+                            } else {
+                                ligarPresenca()
                             }
                         })
                         Spacer(Modifier.width(8.dp))
