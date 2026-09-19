@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 37
-        versionName = "4.9.0"
+        versionCode = 38
+        versionName = "4.9.1"
     }
 
     // Assinatura FIXA (v4.7.1): toda build — sandbox, Actions ou PC — usa a mesma
