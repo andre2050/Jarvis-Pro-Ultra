@@ -11,15 +11,20 @@ import android.os.IBinder
 import android.os.PowerManager
 
 /**
- * PRESENÇA 24H (v4.9.0): o JARVIS escuta "Jarvis" com o celular na mesa,
- * no bolso, tela apagada. Um Foreground Service com o microfone aberto
- * e o Vosk rodando 100% offline.
+ * PRESENÇA 24H (v4.9.0, consertada na v4.9.5): o JARVIS escuta "Jarvis" com
+ * o celular na mesa, no bolso, tela apagada. Foreground Service com o
+ * microfone aberto e o Vosk rodando 100% offline.
  *
- * Quando o senhor chama:
- *  1. o serviço pausa a própria escuta (libera o microfone pro app)
- *  2. abre o MainActivity já em modo "armado, fale o comando"
- *  3. o app cuida do resto (saudação, cérebro, fala)
- * Ao voltar pro fundo, o app devolve o microfone pro serviço (ACTION_RESUME).
+ * v4.9.5 — o que estava quebrando e como ficou:
+ *  1. FALSO-POSITIVO no ato de ligar (Vosk alucina "jarvis" nos primeiros
+ *     áudios e o app abria sozinho em seguida): agora há CARÊNCIA de 2,5s
+ *     após ligar a escuta + DEBOUNCE de 10s entre chamadas.
+ *  2. O serviço PAUSAVA na primeira chamada e NINGUÉM retomava (presença
+ *     morria logo em seguida): agora o MainActivity devolve o microfone com
+ *     ACTION_RESUME sempre que o app vai pro fundo (e devolve também se o
+ *     app fechar).
+ *  3. O modelo carregava na MAIN THREAD (travasso/ANR): agora a escuta
+ *     sobe numa thread própria.
  */
 class JarvisWakeService : Service() {
 
@@ -30,6 +35,11 @@ class JarvisWakeService : Service() {
         const val ACTION_STOP = "com.andre.jarvisultra.wake.STOP"
         const val ACTION_PAUSE = "com.andre.jarvisultra.wake.PAUSE"
         const val ACTION_RESUME = "com.andre.jarvisultra.wake.RESUME"
+
+        /** ignora "jarvis" ouvido nos primeiros ms de escuta (alucinação do Vosk) */
+        private const val CARENCIA_MS = 2500L
+        /** tempo mínimo entre dois disparos de wake */
+        private const val DEBOUNCE_MS = 10000L
 
         fun ligar(ctx: Context) {
             ctx.startForegroundService(
@@ -43,6 +53,9 @@ class JarvisWakeService : Service() {
 
     private var session: JarvisVosk.Session? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var iniciado = false
+    private var inicioEscuta = 0L
+    private var ultimoWake = 0L
     private val mainHandler by lazy { android.os.Handler(mainLooper) }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -54,42 +67,84 @@ class JarvisWakeService : Service() {
                 parar()
                 return START_NOT_STICKY
             }
-            ACTION_PAUSE -> { pausar(); return START_STICKY }
-            ACTION_RESUME -> { retomar(); return START_STICKY }
+            ACTION_PAUSE -> {
+                if (iniciado) pausar()
+                else stopSelf()          // chegou PAUSE sem estar ligado: não vira zumbi
+                return START_STICKY
+            }
+            ACTION_RESUME -> {
+                if (iniciado) retomar()
+                else stopSelf()
+                return START_STICKY
+            }
         }
 
+        // ACTION_START (ou recriação pelo sistema): sobe de fato
         startForeground(NOTIF_ID, notificacao())
+        iniciado = true
         if (wakeLock?.isHeld != true) {
             wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jarvis:wake24h").also {
                     it.setReferenceCounted(false); it.acquire(10 * 60 * 60 * 1000L)
                 }
         }
-        retomar()
+        // com o app aberto o microfone é do app; escutar só quando ele sair de cena
+        if (!WakeCoord.appEmPrimeiroPlano) retomar()
         return START_STICKY   // se o sistema matar, ele volta
     }
 
     private fun retomar() {
         if (session != null) return
         if (!JarvisVosk.hasModel(this)) return   // o app instala o modelo antes de ligar
-        try {
-            session = JarvisVosk.Session(this,
-                onCommand = { },
-                onWake = {
-                    // chamou! libera o microfone e abre o app já armado
-                    mainHandler.post {
-                        pausar()
-                        val i = Intent(this, MainActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            .putExtra("wake", true)
-                        startActivity(i)
-                    }
-                },
-                onState = { })
-            session?.start()
-        } catch (e: Exception) {
-            // microfone ocupado pelo app em primeiro plano — o RESUME resolve depois
+        // o modelo é pesado: carregar fora da main thread (evita travar o app)
+        Thread {
+            if (session != null) return@Thread
+            try {
+                val nova = JarvisVosk.Session(this,
+                    onCommand = { },
+                    onWake = { acordou() },
+                    onState = { })
+                synchronized(this) {
+                    if (session != null) return@Thread  // outro RESUME ganhou a corrida
+                    nova.start()
+                    session = nova
+                    inicioEscuta = System.currentTimeMillis()
+                }
+            } catch (e: Exception) {
+                // microfone ocupado pelo app em primeiro plano — o RESUME resolve depois
+            }
+        }.start()
+    }
+
+    /** O senhor chamou "Jarvis" — mas só se for de verdade. */
+    private fun acordou() {
+        val agora = System.currentTimeMillis()
+        // carência: nos primeiros instantes o Vosk alucina "jarvis" no ruído
+        if (agora - inicioEscuta < CARENCIA_MS) return
+        // debounce: dois disparos seguidos (parcial + final) só abrem o app uma vez
+        if (agora - ultimoWake < DEBOUNCE_MS) return
+        ultimoWake = agora
+
+        mainHandler.post {
+            pausar()   // libera o microfone pro app
+            // app já aberto? ele está com as mãos livres — só avisa que chegou ordem por voz
+            WakeCoord.wakePendente = true
+            if (!WakeCoord.appEmPrimeiroPlano) {
+                try {
+                    startActivity(Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        .putExtra(WakeCoord.EXTRA_WAKE, true))
+                } catch (_: Exception) { }
+            }
         }
+    }
+
+    override fun onDestroy() {
+        // presença encerrada (app fechou de vez / desligaram): devolve o microfone
+        pausar()
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+        super.onDestroy()
     }
 
     private fun pausar() {
@@ -98,6 +153,7 @@ class JarvisWakeService : Service() {
     }
 
     private fun parar() {
+        iniciado = false
         pausar()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null

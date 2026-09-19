@@ -80,6 +80,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -159,6 +160,7 @@ fun JarvisApp() {
         speakingText = texto
         voice.speak(texto)
     }
+
 
     fun analisarFoto(uri: Uri) {
         if (isThinking) return
@@ -252,6 +254,55 @@ fun JarvisApp() {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
+    /**
+     * v4.9.5: arma as mãos livres — usado pelo botão do telefone E pela
+     * presença 24h (quando o senhor chama "Jarvis" com o app fechado, o app
+     * abre e começa a escutar na hora, sem apertar nada).
+     */
+    fun armarMaosLivres() {
+        if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(ctx as Activity, arrayOf(android.Manifest.permission.RECORD_AUDIO), 78)
+            return
+        }
+        if (voskSession != null) return
+        fun startSession() {
+            try {
+                voskSession = JarvisVosk.Session(ctx,
+                    onCommand = { txt -> mainHandler.post {
+        if (Visemas.ehEco(txt, lastSpoken)) {
+            messages = messages + ChatMessage("model", "(eco da minha própria voz captado pelo microfone — descartado, senhor.)")
+        } else send(txt)
+    } },
+                    onWake = { mainHandler.post { say("Pois não, senhor?") } },
+                    onState = { st -> mainHandler.post { handsFree = st } })
+                voskSession?.start()
+                handsFree = "on"
+            } catch (e: Exception) { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
+        }
+        if (!JarvisVosk.hasModel(ctx)) {
+            handsFree = "baixando pacote de voz..."
+            Thread {
+                val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { handsFree = msg } }
+                mainHandler.post { if (err == null) startSession() else handsFree = "falha: " + err }
+            }.start()
+        } else startSession()
+    }
+
+    // v4.9.5: presença 24h — quando o serviço ou "Jarvis" ou o widget chama,
+    // o app arma a escuta sozinho (não abre mais mudo e sem resposta)
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (WakeCoord.wakePendente) {
+                WakeCoord.wakePendente = false
+                showSettings = false   // se o config estava aberto, sai pra conversar
+                armarMaosLivres()
+                if (handsFree == "on") say("Pois não, senhor?")
+                else say("Pois não, senhor? Preciso da permissão do microfone pra ouvi-lo.")
+            }
+            delay(400)
+        }
+    }
+
 
     Box(
         Modifier.fillMaxSize().background(
@@ -453,31 +504,7 @@ fun JarvisApp() {
                 IconButton(onClick = {
                     if (handsFree == "on") {
                         voskSession?.stop(); voskSession = null; handsFree = "off"
-                    } else if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                        ActivityCompat.requestPermissions(ctx as Activity, arrayOf(android.Manifest.permission.RECORD_AUDIO), 78)
-                    } else {
-                        fun startSession() {
-                            try {
-                                voskSession = JarvisVosk.Session(ctx,
-                                    onCommand = { txt -> mainHandler.post {
-                    if (Visemas.ehEco(txt, lastSpoken)) {
-                        messages = messages + ChatMessage("model", "(eco da minha própria voz captado pelo microfone — descartado, senhor.)")
-                    } else send(txt)
-                } },
-                                    onWake = { mainHandler.post { say("Pois não, senhor?") } },
-                                    onState = { s -> mainHandler.post { handsFree = s } })
-                                voskSession?.start()
-                                handsFree = "on"
-                            } catch (e: Exception) { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
-                        }
-                        if (!JarvisVosk.hasModel(ctx)) {
-                            handsFree = "baixando pacote de voz..."
-                            Thread {
-                                val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { handsFree = msg } }
-                                mainHandler.post { if (err == null) startSession() else handsFree = "falha: " + err }
-                            }.start()
-                        } else startSession()
-                    }
+                    } else armarMaosLivres()
                 }) {
                     Icon(Icons.Default.Phone, contentDescription = "Mãos livres",
                         tint = if (handsFree == "on") Cyan else CyanDim)
