@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -203,6 +204,61 @@ fun JarvisApp() {
                 analisarFoto(Uri.fromFile(java.io.File(path)))
             }
         }
+    }
+
+    // v4.9.8: ANEXOS — foto, vídeo e arquivos de qualquer tipo, pelo
+    // seletor do sistema (botão + na barra)
+    fun tratarAnexo(uri: Uri) {
+        val resolver = ctx.contentResolver
+        val mime = try { resolver.getType(uri) ?: "" } catch (_: Exception) { "" }
+        when {
+            mime.startsWith("image/") -> analisarFoto(uri)
+            mime.startsWith("video/") -> {
+                try {
+                    val mmr = android.media.MediaMetadataRetriever()
+                    mmr.setDataSource(ctx, uri)
+                    val frame = mmr.getFrameAtTime(0)
+                    mmr.release()
+                    if (frame == null) {
+                        messages = messages + ChatMessage("model", "Recebi o vídeo, mas não consegui extrair um quadro dele, senhor — mande uma foto que eu enxergo na hora.")
+                    } else {
+                        val f = java.io.File(ctx.cacheDir, "jarvis_quadro.jpg")
+                        f.outputStream().use { frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                        visaoPergunta = "É o primeiro quadro de um vídeo que anexei. Descreva de forma curta e útil."
+                        analisarFoto(Uri.fromFile(f))
+                    }
+                } catch (e: Exception) {
+                    messages = messages + ChatMessage("model", "Não consegui abrir esse vídeo, senhor — codec ou arquivo inválido (" + (e.message ?: "erro") + ").")
+                }
+            }
+            else -> {
+                var nome = "arquivo"; var tam = -1L
+                try {
+                    resolver.query(uri, null, null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            val iN = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            val iT = c.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                            if (iN >= 0) nome = c.getString(iN) ?: nome
+                            if (iT >= 0) tam = c.getLong(iT)
+                        }
+                    }
+                } catch (_: Exception) { }
+                val tamTxt = if (tam >= 0)
+                    String.format(java.util.Locale("pt", "BR"),
+                        if (tam > 1024 * 1024) "%.1f MB" else "%.0f KB",
+                        if (tam > 1024 * 1024) tam / 1048576.0 else tam / 1024.0)
+                else "tamanho desconhecido"
+                messages = messages + ChatMessage("model",
+                    "Arquivo recebido: " + nome + " (" + tamTxt +
+                    (if (mime.isNotBlank()) ", " + mime else "") + ").\n\n" +
+                    "Por enquanto eu enxergo FOTOS e VÍDEOS por dentro, senhor — esse tipo ainda não consigo abrir. Se quiser análise, me mande como imagem ou vídeo.")
+                say("Arquivo " + nome + " recebido, senhor.")
+            }
+        }
+    }
+
+    val anexoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) tratarAnexo(uri)
     }
 
     val camPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -535,6 +591,10 @@ fun JarvisApp() {
                         tint = if (handsFree == "on") Cyan else CyanDim)
                 }
 
+                // v4.9.8: + anexar foto, vídeo ou arquivo do celular
+                IconButton(onClick = { anexoLauncher.launch("*/*") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Anexar foto, vídeo ou arquivo", tint = Cyan)
+                }
                 IconButton(onClick = { abrirCamera(null) }) {
                     Icon(Icons.Default.PhotoCamera, contentDescription = "Visão — abrir câmera", tint = Cyan)
                 }
