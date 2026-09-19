@@ -21,7 +21,8 @@ class JarvisVoice(ctx: Context) {
     private val pending = ConcurrentHashMap<String, String>()
 
     init {
-        tts = TextToSpeech(ctx.applicationContext) { status ->
+        tts = try {
+            TextToSpeech(ctx.applicationContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("pt", "BR")
                 tts?.setSpeechRate(rate)
@@ -41,6 +42,7 @@ class JarvisVoice(ctx: Context) {
                 pending.forEach { (id, text) -> speakNow(text, id) }
             }
         }
+        } catch (_: Exception) { null }   // sem voz é melhor que sem app
     }
 
     fun setEnabled(v: Boolean) { enabled = v }

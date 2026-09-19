@@ -11,12 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
- * v4.9.5: agora a activity PARTICIPA da presença 24h:
- *  - aberta pelo serviço (wake=true) ou pelo widget → marca wakePendente,
- *    e o JarvisApp arma as mãos livres sozinho: o app abre JÁ ESCUTANDO
- *  - onStart: o microfone passa a ser do APP (serviço de presença pausa)
- *  - onStop: o microfone VOLTA pro serviço de presença (se estiver ligado)
- *    — antes ninguém devolvia, e a presença morria após a primeira chamada
+ * v4.9.7: com a presença ligada, o SERVIÇO é o único dono do microfone.
+ * A activity agora só: (1) marca se está visível (o serviço usa isso pra
+ * decidir se precisa abrir o app ao ouvir "Jarvis"), (2) repassa o extra
+ * wake (presença/widget) pro JarvisApp saudar e mostrar a conversa.
+ * Nada de PAUSE/RESUME de microfone aqui — essa disputa derrubava o app.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,15 +42,11 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         WakeCoord.appEmPrimeiroPlano = true
-        // app visível: microfone do app, presença em espera
-        if (SettingsStore.getWake24h(this)) WakeCoord.avisarServico(this, JarvisWakeService.ACTION_PAUSE)
     }
 
     override fun onStop() {
         super.onStop()
         WakeCoord.appEmPrimeiroPlano = false
-        // app saiu de cena: presença retoma a escuta de fundo
-        if (SettingsStore.getWake24h(this)) WakeCoord.avisarServico(this, JarvisWakeService.ACTION_RESUME)
     }
 }
 

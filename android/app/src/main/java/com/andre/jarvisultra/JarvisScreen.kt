@@ -269,6 +269,11 @@ fun JarvisApp() {
             return
         }
         if (voskSession != null) return
+        // v4.9.7: presença ligada = microfone é do serviço, escuta por lá
+        if (SettingsStore.getWake24h(ctx)) {
+            handsFree = "presença ativa — diga \"Jarvis\""
+            return
+        }
         // v4.9.6: trava contra armamento duplo (chamado externo + botão)
         if (!armando.compareAndSet(false, true)) return
         handsFree = if (JarvisVosk.hasModel(ctx)) "ligando escuta..." else "baixando pacote de voz..."
@@ -303,18 +308,21 @@ fun JarvisApp() {
         }.start()
     }
 
-    // v4.9.5: presença 24h — quando o serviço ou "Jarvis" ou o widget chama,
-    // o app arma a escuta sozinho (não abre mais mudo e sem resposta)
+    // v4.9.7: presença com dono único de microfone — o SERVIÇO escuta;
+    // o app só saúda quando é chamado e processa o comando que o serviço
+    // capturou. O app NUNCA abre uma escuta Vosk por cima da presença
+    // (era essa disputa que derrubava o app em crash nativo).
     LaunchedEffect(Unit) {
         while (true) {
             if (WakeCoord.wakePendente) {
                 WakeCoord.wakePendente = false
                 showSettings = false   // se o config estava aberto, sai pra conversar
                 say("Pois não, senhor?")
-                // v4.9.6: meio segundo de fôlego pro serviço de presença
-                // soltar o microfone antes de armar a escuta do app
-                delay(600)
-                armarMaosLivres()
+            }
+            val cmd = WakeCoord.comandoPendente
+            if (cmd != null) {
+                WakeCoord.comandoPendente = null
+                if (!Visemas.ehEco(cmd, lastSpoken)) send(cmd)
             }
             delay(400)
         }
@@ -638,10 +646,18 @@ fun JarvisApp() {
                             presenca24h = on
                             SettingsStore.setWake24h(ctx, on)
                             if (on) {
+                                // v4.9.7: o serviço é o dono único do microfone —
+                                // escuta local do app (se houver) se encerra
+                                try { voskSession?.stop() } catch (_: Exception) { }
+                                voskSession = null
+                                if (handsFree == "on") handsFree = "presença ativa — diga \"Jarvis\""
                                 if (!JarvisVosk.hasModel(ctx)) {
                                     Thread { JarvisVosk.ensureModel(ctx) { }; mainHandler.post { JarvisWakeService.ligar(ctx) } }.start()
                                 } else JarvisWakeService.ligar(ctx)
-                            } else JarvisWakeService.desligar(ctx)
+                            } else {
+                                if (handsFree.startsWith("presença")) handsFree = "off"
+                                JarvisWakeService.desligar(ctx)
+                            }
                         })
                         Spacer(Modifier.width(8.dp))
                         Text(if (presenca24h) "ligado — de prontidão" else "desligado", fontSize = 12.sp)

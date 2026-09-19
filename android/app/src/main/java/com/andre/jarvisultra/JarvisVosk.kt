@@ -164,6 +164,9 @@ object JarvisVosk {
             onState("off")
         }
 
+        /** v4.9.7: cancela um armamento (wake alucinado na carência inicial). */
+        fun desarmar() { armed = false }
+
         override fun onPartialResult(partial: String) {
             val t = JSONObject(partial).optString("partial", "").lowercase()
             if (!armed && t.contains("jarvis")) {
