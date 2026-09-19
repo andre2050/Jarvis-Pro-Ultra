@@ -22,7 +22,7 @@ object WakeCoord {
 
     fun avisarServico(ctx: Context, action: String) {
         try {
-            ctx.startService(
+            ctx.startForegroundService(
                 Intent(ctx, JarvisWakeService::class.java).setAction(action))
         } catch (_: Exception) { }
     }

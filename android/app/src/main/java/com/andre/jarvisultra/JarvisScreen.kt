@@ -112,6 +112,8 @@ fun JarvisApp() {
     // dublagem: libera o rosto quando a voz termina
     LaunchedEffect(isSpeaking) { if (!isSpeaking) speakingText = null }
     var voskSession by remember { mutableStateOf<JarvisVosk.Session?>(null) }
+    // v4.9.6: trava contra armamento duplo de escuta
+    val armando = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     // --- VISÃO COMPUTACIONAL v4.5.0 ---
     var pendingFacing by remember { mutableStateOf(androidx.camera.core.CameraSelector.LENS_FACING_BACK) }
     var visaoPergunta by remember { mutableStateOf<String?>(null) }
@@ -127,6 +129,8 @@ fun JarvisApp() {
     DisposableEffect(Unit) { onDispose { voice.shutdown() } }
 
     val history = remember { JSONArray() }
+    // v4.9.6 caixa-preta: se o app fechou sozinho na última vez, mostra o motivo
+    var crashReport by remember { mutableStateOf(JarvisUltraApp.lerUltimoCrash(ctx)) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(apiKeySaved) {
@@ -265,27 +269,38 @@ fun JarvisApp() {
             return
         }
         if (voskSession != null) return
-        fun startSession() {
+        // v4.9.6: trava contra armamento duplo (chamado externo + botão)
+        if (!armando.compareAndSet(false, true)) return
+        handsFree = if (JarvisVosk.hasModel(ctx)) "ligando escuta..." else "baixando pacote de voz..."
+        // v4.9.6: o modelo Vosk NUNCA mais carrega na main thread (evita
+        // travar a UI e o sistema matar o app por ANR)
+        Thread {
             try {
-                voskSession = JarvisVosk.Session(ctx,
+                if (!JarvisVosk.hasModel(ctx)) {
+                    val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { handsFree = msg } }
+                    if (err != null) {
+                        mainHandler.post { handsFree = "falha: " + err }
+                        armando.set(false)
+                        return@Thread
+                    }
+                }
+                val nova = JarvisVosk.Session(ctx,
                     onCommand = { txt -> mainHandler.post {
-        if (Visemas.ehEco(txt, lastSpoken)) {
-            messages = messages + ChatMessage("model", "(eco da minha própria voz captado pelo microfone — descartado, senhor.)")
-        } else send(txt)
-    } },
+                        if (Visemas.ehEco(txt, lastSpoken)) {
+                            messages = messages + ChatMessage("model", "(eco da minha própria voz captado pelo microfone — descartado, senhor.)")
+                        } else send(txt)
+                    } },
                     onWake = { mainHandler.post { say("Pois não, senhor?") } },
                     onState = { st -> mainHandler.post { handsFree = st } })
-                voskSession?.start()
-                handsFree = "on"
-            } catch (e: Exception) { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
-        }
-        if (!JarvisVosk.hasModel(ctx)) {
-            handsFree = "baixando pacote de voz..."
-            Thread {
-                val err = JarvisVosk.ensureModel(ctx) { msg -> mainHandler.post { handsFree = msg } }
-                mainHandler.post { if (err == null) startSession() else handsFree = "falha: " + err }
-            }.start()
-        } else startSession()
+                nova.start()
+                mainHandler.post {
+                    if (voskSession == null) { voskSession = nova; handsFree = "on" }
+                }
+            } catch (e: Exception) {
+                mainHandler.post { handsFree = "erro: " + (e.message ?: "falha ao iniciar") }
+            }
+            armando.set(false)
+        }.start()
     }
 
     // v4.9.5: presença 24h — quando o serviço ou "Jarvis" ou o widget chama,
@@ -295,9 +310,11 @@ fun JarvisApp() {
             if (WakeCoord.wakePendente) {
                 WakeCoord.wakePendente = false
                 showSettings = false   // se o config estava aberto, sai pra conversar
+                say("Pois não, senhor?")
+                // v4.9.6: meio segundo de fôlego pro serviço de presença
+                // soltar o microfone antes de armar a escuta do app
+                delay(600)
                 armarMaosLivres()
-                if (handsFree == "on") say("Pois não, senhor?")
-                else say("Pois não, senhor? Preciso da permissão do microfone pra ouvi-lo.")
             }
             delay(400)
         }
@@ -550,6 +567,26 @@ fun JarvisApp() {
     }
     }
 
+    if (crashReport != null) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("DIAGNÓSTICO — o app fechou sozinho") },
+            text = {
+                Text(
+                    "O JARVIS fechou sem aviso na última vez. Motivo exato (envia um print disso pro criador que ele resolve na hora):\n\n" +
+                    (crashReport ?: ""),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFFE2F3FA)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { JarvisUltraApp.apagarCrash(ctx); crashReport = null }) {
+                    Text("OK — entendi")
+                }
+            }
+        )
+    }
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { if (apiKeySaved) showSettings = false },

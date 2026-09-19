@@ -11,20 +11,22 @@ import android.os.IBinder
 import android.os.PowerManager
 
 /**
- * PRESENÇA 24H (v4.9.0, consertada na v4.9.5): o JARVIS escuta "Jarvis" com
- * o celular na mesa, no bolso, tela apagada. Foreground Service com o
- * microfone aberto e o Vosk rodando 100% offline.
+ * PRESENÇA 24H (v4.9.0, consertada v4.9.5, blindada v4.9.6): o JARVIS escuta
+ * "Jarvis" com o celular na mesa, no bolso, tela apagada. Foreground Service
+ * com o microfone aberto e o Vosk rodando 100% offline.
  *
- * v4.9.5 — o que estava quebrando e como ficou:
- *  1. FALSO-POSITIVO no ato de ligar (Vosk alucina "jarvis" nos primeiros
- *     áudios e o app abria sozinho em seguida): agora há CARÊNCIA de 2,5s
- *     após ligar a escuta + DEBOUNCE de 10s entre chamadas.
- *  2. O serviço PAUSAVA na primeira chamada e NINGUÉM retomava (presença
- *     morria logo em seguida): agora o MainActivity devolve o microfone com
- *     ACTION_RESUME sempre que o app vai pro fundo (e devolve também se o
- *     app fechar).
- *  3. O modelo carregava na MAIN THREAD (travasso/ANR): agora a escuta
- *     sobe numa thread própria.
+ * v4.9.6 — blindagem total contra o "abre e fecha":
+ *  - REGRA ÚNICA de dono do microfone: app aberto → escuta do app (serviço
+ *    pausa); app no fundo → escuta do serviço. Qualquer intent (START,
+ *    PAUSE, RESUME, recriação do sistema) cai na MESMA lógica — sem estado
+ *    inconsistente, sem zumbi, sem presença morta.
+ *  - SEMPRE startForeground() no início de qualquer onStartCommand: quem
+ *    chega via startForegroundService (obrigatório a partir do onStop do
+ *    app) NUNCA derruba o app por não chamar startForeground em 5s
+ *    (ForegroundServiceDidNotStartInTimeException — crash real).
+ *  - carência 2,5s + debounce 10s contra alucinação do Vosk (v4.9.5).
+ *  - modelo carrega em thread própria, nunca na main (v4.9.5).
+ *  - qualquer crash do processo é gravado pela caixa-preta (JarvisUltraApp).
  */
 class JarvisWakeService : Service() {
 
@@ -53,7 +55,6 @@ class JarvisWakeService : Service() {
 
     private var session: JarvisVosk.Session? = null
     private var wakeLock: PowerManager.WakeLock? = null
-    private var iniciado = false
     private var inicioEscuta = 0L
     private var ultimoWake = 0L
     private val mainHandler by lazy { android.os.Handler(mainLooper) }
@@ -61,35 +62,24 @@ class JarvisWakeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                SettingsStore.setWake24h(this, false)
-                parar()
-                return START_NOT_STICKY
-            }
-            ACTION_PAUSE -> {
-                if (iniciado) pausar()
-                else stopSelf()          // chegou PAUSE sem estar ligado: não vira zumbi
-                return START_STICKY
-            }
-            ACTION_RESUME -> {
-                if (iniciado) retomar()
-                else stopSelf()
-                return START_STICKY
-            }
+        if (intent?.action == ACTION_STOP) {
+            SettingsStore.setWake24h(this, false)
+            parar()
+            return START_NOT_STICKY
         }
 
-        // ACTION_START (ou recriação pelo sistema): sobe de fato
+        // START, PAUSE, RESUME ou recriação do sistema: primeiro deixa o
+        // estado de foreground garantido (exigência do startForegroundService)
         startForeground(NOTIF_ID, notificacao())
-        iniciado = true
         if (wakeLock?.isHeld != true) {
             wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jarvis:wake24h").also {
                     it.setReferenceCounted(false); it.acquire(10 * 60 * 60 * 1000L)
                 }
         }
-        // com o app aberto o microfone é do app; escutar só quando ele sair de cena
-        if (!WakeCoord.appEmPrimeiroPlano) retomar()
+
+        // REGRA ÚNICA: microfone do app se o app está aberto, meu se não está
+        if (WakeCoord.appEmPrimeiroPlano) pausar() else retomar()
         return START_STICKY   // se o sistema matar, ele volta
     }
 
@@ -153,7 +143,6 @@ class JarvisWakeService : Service() {
     }
 
     private fun parar() {
-        iniciado = false
         pausar()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
