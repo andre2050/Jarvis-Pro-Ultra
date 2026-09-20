@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "4.10.0"
+    const val APP_VERSION = "4.10.1"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -62,25 +62,20 @@ object JarvisBrain {
         )
 
         // ---- v4.10.0: CÉREBRO LOCAL (offline) ----
+        // v4.10.1: no modo LOCAL o app NUNCA cai pra nuvem em silêncio —
+        // se o senhor escolheu local, ele diz exatamente o que falta.
         val modoLocal = SettingsStore.getBrainMode(ctx) == "local" && imageB64 == null
         if (modoLocal) {
             if (!JarvisLocalLLM.hasModel(ctx)) {
-                if (SettingsStore.hasApiKey(ctx)) {
-                    // sem modelo baixado, mas tem chave — segue nuvem sem drama
-                } else {
-                    return TurnResult(
-                        "O cérebro local ainda não tem modelo, senhor. Toque em ⚙ CONFIG → CÉREBRO LOCAL e baixe o pacote (529MB, uma vez só, prefira Wi-Fi) — ou cole uma chave do Gemini pra eu pensar na nuvem.",
-                        contents, emptyList())
-                }
-            } else {
-                turnoLocal(ctx, contents, userMessage, mems)?.let { return it }
-                // modelo não carregou (RAM cheia etc): cai pro plano B
-                if (!SettingsStore.hasApiKey(ctx)) {
-                    return TurnResult(
-                        "O cérebro local não conseguiu carregar agora, senhor — memória do aparelho apertada. Feche outros apps e tente de novo.",
-                        contents, emptyList())
-                }
+                return TurnResult(
+                    "O modo LOCAL está ligado, mas o modelo offline ainda não foi baixado, senhor. Toque em ⚙ CONFIG → CÉREBRO LOCAL → Baixar cérebro offline (529MB, uma vez só, com internet). Depois de baixado, eu penso 100% sem internet — até em modo avião.",
+                    contents, emptyList())
             }
+            val local = turnoLocal(ctx, contents, userMessage, mems)
+            if (local != null) return local
+            return TurnResult(
+                "O modelo local não conseguiu carregar agora, senhor — provavelmente memória do aparelho apertada. Feche outros apps e tente de novo, ou volte pro modo ☁️ NUVEM em ⚙ CONFIG.",
+                contents, emptyList())
         }
 
         val toolsUsed = mutableListOf<String>()
