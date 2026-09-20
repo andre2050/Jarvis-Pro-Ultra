@@ -17,6 +17,7 @@ object SettingsStore {
     private const val KEY_AVATAR_INTRO = "v48_avatar_intro"
     private const val KEY_WAKE_24H = "wake24h_enabled"
     private const val KEY_AVISO_PRESENCA = "aviso_presenca"
+    private const val KEY_BRAIN_MODE = "brain_mode"
     private const val KEY_BRIEFING_ON = "briefing_enabled"
     private const val KEY_BRIEFING_HORA = "briefing_hora"
 
@@ -88,6 +89,12 @@ object SettingsStore {
     fun getAvisoPresenca(ctx: Context): String? = prefs(ctx).getString(KEY_AVISO_PRESENCA, null)
     fun setAvisoPresenca(ctx: Context, msg: String?) {
         prefs(ctx).edit().putString(KEY_AVISO_PRESENCA, msg).apply()
+    }
+
+    // ---- v4.10.0: cérebro local (offline) ou nuvem (Gemini) ----
+    fun getBrainMode(ctx: Context): String = prefs(ctx).getString(KEY_BRAIN_MODE, "cloud") ?: "cloud"
+    fun setBrainMode(ctx: Context, v: String) {
+        prefs(ctx).edit().putString(KEY_BRAIN_MODE, v).apply()
     }
 
     // ---- Briefing matinal (v4.9.0) ----

@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "4.9.10"
+    const val APP_VERSION = "4.10.0"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -61,6 +61,28 @@ object JarvisBrain {
             basePrompt + visaoNota + "\nMem\u00f3rias de longo prazo sobre o usu\u00e1rio (use quando relevante):\n- " + mems.joinToString("\n- ")
         )
 
+        // ---- v4.10.0: CÉREBRO LOCAL (offline) ----
+        val modoLocal = SettingsStore.getBrainMode(ctx) == "local" && imageB64 == null
+        if (modoLocal) {
+            if (!JarvisLocalLLM.hasModel(ctx)) {
+                if (SettingsStore.hasApiKey(ctx)) {
+                    // sem modelo baixado, mas tem chave — segue nuvem sem drama
+                } else {
+                    return TurnResult(
+                        "O cérebro local ainda não tem modelo, senhor. Toque em ⚙ CONFIG → CÉREBRO LOCAL e baixe o pacote (529MB, uma vez só, prefira Wi-Fi) — ou cole uma chave do Gemini pra eu pensar na nuvem.",
+                        contents, emptyList())
+                }
+            } else {
+                turnoLocal(ctx, contents, userMessage, mems)?.let { return it }
+                // modelo não carregou (RAM cheia etc): cai pro plano B
+                if (!SettingsStore.hasApiKey(ctx)) {
+                    return TurnResult(
+                        "O cérebro local não conseguiu carregar agora, senhor — memória do aparelho apertada. Feche outros apps e tente de novo.",
+                        contents, emptyList())
+                }
+            }
+        }
+
         val toolsUsed = mutableListOf<String>()
 
         for (round in 1..MAX_TOOL_ROUNDS) {
@@ -101,5 +123,120 @@ object JarvisBrain {
             contents.put(JSONObject().put("role", "user").put("parts", responseParts))
         }
         return TurnResult("Cheguei ao limite de tools num único turno, senhor — que tal quebrar a pergunta?", contents, toolsUsed)
+    }
+
+    // ================= CÉREBRO LOCAL (v4.10.0) =================
+
+    /** Um turno 100% offline com o Gemma 3 1B do aparelho. Null = não conseguiu (cae pro Gemini). */
+    private suspend fun turnoLocal(ctx: Context, contents: JSONArray, userMessage: String,
+                                      mems: List<String>): TurnResult? {
+        val llm = JarvisLocalLLM.obter(ctx) ?: return null
+        JarvisMemory.ensure(ctx)
+
+        // ferramentas em formato compacto pro modelo pequeno
+        val decls = JarvisTools.declarations()
+        val nomes = mutableSetOf<String>()
+        val lista = StringBuilder()
+        for (i in 0 until decls.length()) {
+            val d = decls.optJSONObject(i) ?: continue
+            val nome = d.optString("name")
+            nomes.add(nome)
+            val desc = d.optString("description").replace("\n", " ").take(110)
+            lista.append("- ").append(nome).append(": ").append(desc).append('\n')
+        }
+
+        val sys = """
+            Você é J.A.R.V.I.S PRO ULTRA, o assistente pessoal do André, rodando 100% OFFLINE dentro do celular dele.
+            Personalidade: direto, levemente espirituoso, eficiente — um mordomo digital de língua afiada.
+            Regras:
+            - Responda sempre em português do Brasil, curto e prático (máximo 3 frases).
+            - Chame o usuário de 'senhor'.
+            - Você tem FERRAMENTAS do telefone. Para usar uma, responda APENAS um JSON: {"tool": "nome_da_ferramenta", "args": {}}
+            - Para responder sem ferramenta, responda APENAS um JSON: {"resposta": "seu texto aqui"}
+            - NÃO use ferramenta se a resposta for conversa, opinião ou conhecimento geral.
+            FERRAMENTAS DISPONÍVEIS:
+            ${lista.toString().trim()}
+        """.trimIndent()
+
+        val memoria = if (mems.isEmpty()) "" else
+            "\nMemórias de longo prazo sobre o usuário (use quando relevante):\n- " + mems.take(5).joinToString("\n- ")
+
+        val conversa = StringBuilder()
+        val ultimos = mutableListOf<String>()
+        for (i in 0 until contents.length()) {
+            val turn = contents.optJSONObject(i) ?: continue
+            val quem = if (turn.optString("role") == "user") "Usuário: " else "JARVIS: "
+            val parts = turn.optJSONArray("parts") ?: continue
+            for (j in 0 until parts.length()) {
+                val part = parts.optJSONObject(j) ?: continue
+                val txt = part.opt("text") as? String ?: continue
+                ultimos.add(quem + txt.trim())
+            }
+        }
+        for (linha in ultimos.takeLast(8).dropLast(1)) conversa.append(linha).append('\n')
+
+        var prompt = sys + "\n" + JarvisPercepcao.contextoDoAparelho(ctx) + memoria +
+            "\nCONVERSA ATÉ AGORA:\n" + conversa.toString().trim() +
+            "\nUsuário: " + userMessage.trim() + "\nJARVIS:"
+
+        val toolsUsed = mutableListOf<String>()
+        var resposta = ""
+
+        for (round in 1..2) {
+            val saida = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { llm.generateResponse(prompt) }
+            } catch (e: Exception) { return null }
+
+            val (toolNome, toolArgs) = parseTool(saida)
+            if (toolNome == null || toolNome !in nomes) {
+                resposta = parseResposta(saida)
+                break
+            }
+
+            // modelo pediu ferramenta -> executa e faz a 2ª rodada com o resultado
+            val output = try {
+                JarvisTools.execute(ctx, toolNome, toolArgs)
+            } catch (e: Exception) { "erro na ferramenta: ${e.message}" }
+            JarvisMemory.logInteraction(ctx, toolNome, output.take(80))
+            toolsUsed.add(toolNome)
+
+            prompt = prompt + "\nJARVIS (pediu ferramenta {\"tool\": \"$toolNome\"})\n" +
+                "RESULTADO DA FERRAMENTA $toolNome: $output\n" +
+                "Agora responda ao usuário com o resultado em APENAS um JSON: {\"resposta\": \"texto curto em português\"}.\nJARVIS:"
+        }
+
+        if (resposta.isBlank()) resposta = "Desculpe, senhor — o processador local travou no raciocínio. Pergunte de novo."
+        contents.put(JSONObject()
+            .put("role", "model")
+            .put("parts", JSONArray().put(JSONObject().put("text", resposta))))
+        return TurnResult(resposta, contents, toolsUsed)
+    }
+
+    /** Procura {"tool": ..., "args": {...}} na saída do modelo pequeno. */
+    private fun parseTool(saida: String): Pair<String?, JSONObject> {
+        val regex = Regex("""\{[^{}]*"tool"[^{}]*\}""")
+        val m = regex.find(saida) ?: return Pair(null, JSONObject())
+        return try {
+            val o = JSONObject(m.value)
+            val args = try { o.optJSONObject("args") ?: JSONObject() } catch (_: Exception) { JSONObject() }
+            Pair(o.optString("tool"), args)
+        } catch (_: Exception) { Pair(null, JSONObject()) }
+    }
+
+    /** Extrai {"resposta": ...} ou limpa o texto cru do modelo. */
+    private fun parseResposta(saida: String): String {
+        val regex = Regex("""\{\s*"resposta"\s*:\s*"(.*?)"\s*\}""", RegexOption.DOT_MATCHES_ALL)
+        val m = regex.find(saida)
+        if (m != null) {
+            return m.groupValues[1]
+                .replace("\\n", "\n")
+                .replace("\\'", "'")
+        }
+        // sem JSON: devolve o texto sem a persona vazando
+        var t = saida.trim()
+        if (t.startsWith("{") && t.endsWith("}")) {
+            try { t = JSONObject(t).optString("resposta", t) } catch (_: Exception) { }
+        }
+        return t.take(600)
     }
 }

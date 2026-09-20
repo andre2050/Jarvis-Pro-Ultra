@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 47
-        versionName = "4.9.10"
+        versionCode = 48
+        versionName = "4.10.0"
     }
 
     // Assinatura FIXA (v4.7.1): toda build — sandbox, Actions ou PC — usa a mesma
@@ -70,5 +70,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.3")
     implementation("androidx.camera:camera-view:1.3.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // v4.10.0: cérebro 100% local — Gemma 3 1B rodando no aparelho (MediaPipe do Google)
+    implementation("com.google.mediapipe:tasks-genai:0.10.27")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

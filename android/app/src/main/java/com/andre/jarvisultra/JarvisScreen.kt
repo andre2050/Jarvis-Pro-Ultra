@@ -295,8 +295,10 @@ fun JarvisApp() {
     fun send(forced: String? = null) {
         val msg = (forced ?: input).trim()
         if (msg.isEmpty() || isThinking) return
-        if (!apiKeySaved) {
-            messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — toque na engrenagem no topo, cole a chave e salve. Aí sim, às ordens.")
+        // v4.10.0: no cérebro LOCAL a chave é opcional (100% offline).
+        val brainLocal = SettingsStore.getBrainMode(ctx) == "local" && JarvisLocalLLM.hasModel(ctx)
+        if (!apiKeySaved && !brainLocal) {
+            messages = messages + ChatMessage("model", "Ainda não tenho a chave do Gemini, senhor — toque na engrenagem no topo, cole a chave e salve. Ou ative o CÉREBRO LOCAL em ⚙ CONFIG e baixe o modelo: aí eu penso offline, sem chave nenhuma.")
             return
         }
         input = ""
@@ -717,6 +719,57 @@ fun JarvisApp() {
                     }) { Text("Testar chave", fontSize = 12.sp) }
                     testResult?.let { tr ->
                         Text(tr, fontSize = 12.sp, color = Cyan)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Text("CÉREBRO — NUVEM OU LOCAL", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Cyan, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Onde o JARVIS pensa: na NUVEM (Gemini, precisa de chave e internet) ou 100% LOCAL dentro do celular — modelo Gemma 3 1B do Google rodando offline, sem chave e sem internet. Conversa privada por definição.", fontSize = 12.sp)
+                    var brainMode by remember { mutableStateOf(SettingsStore.getBrainMode(ctx)) }
+                    var llmProg by remember { mutableStateOf(-1) }  // -1=parado, 0..100=baixando, 101=ok
+                    var llmErro by remember { mutableStateOf<String?>(null) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            brainMode = "cloud"; SettingsStore.setBrainMode(ctx, "cloud")
+                            JarvisLocalLLM.liberarMemoria()
+                        }) {
+                            Text("☁️ NUVEM", fontSize = 12.sp,
+                                color = if (brainMode == "cloud") Cyan else Color(0xFF5A7A84))
+                        }
+                        TextButton(onClick = {
+                            brainMode = "local"; SettingsStore.setBrainMode(ctx, "local")
+                        }) {
+                            Text("📱 LOCAL", fontSize = 12.sp,
+                                color = if (brainMode == "local") Cyan else Color(0xFF5A7A84))
+                        }
+                    }
+                    if (brainMode == "local") {
+                        val temModelo = JarvisLocalLLM.hasModel(ctx) || llmProg == 101
+                        if (llmProg in 0..100) {
+                            Text("⬇️ Baixando cérebro offline… $llmProg% (529MB — pode demorar, use Wi-Fi)", fontSize = 11.sp, color = CyanDim)
+                        } else if (temModelo) {
+                            Text("✅ Cérebro offline pronto — o JARVIS pensa dentro do aparelho, sem internet e sem chave.", fontSize = 11.sp, color = Cyan)
+                            TextButton(onClick = {
+                                JarvisLocalLLM.removerModelo(ctx)
+                                llmProg = -1; llmErro = null
+                            }) { Text("Remover modelo (libera 529MB)", fontSize = 11.sp, color = Color(0xFFFFB74D)) }
+                        } else {
+                            if (llmErro != null) Text("⚠️ $llmErro", fontSize = 11.sp, color = Color(0xFFFFB74D))
+                            TextButton(onClick = {
+                                llmErro = null; llmProg = 0
+                                Thread {
+                                    val erro = JarvisLocalLLM.downloadModel(ctx) { pct ->
+                                        mainHandler.post { llmProg = pct }
+                                    }
+                                    mainHandler.post {
+                                        if (erro == null) llmProg = 101 else { llmErro = erro; llmProg = -1 }
+                                    }
+                                }.start()
+                            }) { Text("⬇️ Baixar cérebro offline (529MB, use Wi-Fi)", fontSize = 12.sp) }
+                            Text("Espaço livre no aparelho: ${JarvisLocalLLM.espacoLivreMb(ctx)}MB", fontSize = 10.sp, color = CyanDim)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text("No modo local, o modelo pequeno às vezes simplifica — as ferramentas do telefone (ligar, clima, alarme, WhatsApp…) continuam funcionando. Foto e visão seguem na nuvem.", fontSize = 10.sp, color = CyanDim)
                     }
 
                     Spacer(Modifier.height(16.dp))
