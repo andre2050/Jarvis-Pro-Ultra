@@ -19,8 +19,14 @@ import java.util.concurrent.TimeUnit
  */
 object JarvisLocalLLM {
 
-    private const val MODEL_URL =
+    // v4.10.2: o repositório oficial (litert-community/Gemma3-1B-IT) virou GATED no
+    // HuggingFace (exigia login → 401 no aparelho do André). Espelho público com o
+    // MESMO arquivo de 529MB: K4N4T/gemma3-1B-it-int4.task. Se um dia este também
+    // morrer, procurar outro espelho do "gemma3-1b-it-int4.task" no HuggingFace.
+    private val MODEL_URLS = listOf(
+        "https://huggingface.co/K4N4T/gemma3-1B-it-int4.task/resolve/main/gemma3-1B-it-int4.task",
         "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task"
+    )
     private const val MODEL_MIN_BYTES = 100_000_000L // 100MB — menor que isso = download quebrado
 
     private val http = OkHttpClient.Builder()
@@ -100,9 +106,24 @@ object JarvisLocalLLM {
         }
 
         val part = File(dest.absolutePath + ".part")
-        try {
-            http.newCall(okhttp3.Request.Builder().url(MODEL_URL).build()).execute().use { r ->
-                if (!r.isSuccessful) return "Servidor respondeu ${r.code}"
+        var ultimoErro: String? = null
+        for (url in MODEL_URLS) {
+        val erroTentativa = try { baixarDe(url, part, onProgress) } catch (e: Exception) {
+            "Falha no download: ${e.message ?: "sem detalhes"}"
+        }
+        if (erroTentativa == null) return null
+        ultimoErro = erroTentativa
+        }
+        return ultimoErro ?: "Não consegui baixar o modelo."
+        }
+
+        private fun baixarDe(url: String, part: File, onProgress: (Int) -> Unit): String? {
+            try {
+            http.newCall(okhttp3.Request.Builder().url(url).build()).execute().use { r ->
+                if (!r.isSuccessful) return when (r.code) {
+                    401, 403 -> "O servidor pediu login pra esse arquivo (401) — o link do modelo morreu. Avisa o Kaelo que ele troca o espelho."
+                    else -> "Servidor respondeu ${r.code}"
+                }
                 val total = r.body!!.contentLength()
                 var done = 0L
                 var lastPct = -1
@@ -126,7 +147,7 @@ object JarvisLocalLLM {
                 }
             }
             if (part.length() < MODEL_MIN_BYTES) { part.delete(); return "Arquivo baixado veio quebrado." }
-            part.renameTo(dest)
+            part.renameTo(File(part.parentFile, part.nameWithoutExtension))
             return null
         } catch (e: Exception) {
             part.delete()
