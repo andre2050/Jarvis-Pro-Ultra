@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 object JarvisBrain {
 
-    const val APP_VERSION = "4.10.2"
+    const val APP_VERSION = "4.10.3"
     private const val MAX_TOOL_ROUNDS = 4
 
     fun systemPrompt(): String = """
@@ -122,7 +122,7 @@ object JarvisBrain {
 
     // ================= CÉREBRO LOCAL (v4.10.0) =================
 
-    /** Um turno 100% offline com o Gemma 3 1B do aparelho. Null = não conseguiu (cae pro Gemini). */
+    /** Um turno 100% offline com o Gemma 3 1B do aparelho. Null = não conseguiu; o chamador avisa sem recorrer à nuvem. */
     private suspend fun turnoLocal(ctx: Context, contents: JSONArray, userMessage: String,
                                       mems: List<String>): TurnResult? {
         val llm = JarvisLocalLLM.obter(ctx) ?: return null
@@ -207,16 +207,9 @@ object JarvisBrain {
         return TurnResult(resposta, contents, toolsUsed)
     }
 
-    /** Procura {"tool": ..., "args": {...}} na saída do modelo pequeno. */
-    private fun parseTool(saida: String): Pair<String?, JSONObject> {
-        val regex = Regex("""\{[^{}]*"tool"[^{}]*\}""")
-        val m = regex.find(saida) ?: return Pair(null, JSONObject())
-        return try {
-            val o = JSONObject(m.value)
-            val args = try { o.optJSONObject("args") ?: JSONObject() } catch (_: Exception) { JSONObject() }
-            Pair(o.optString("tool"), args)
-        } catch (_: Exception) { Pair(null, JSONObject()) }
-    }
+    /** Lê JSON completo, incluindo args aninhados, sem regex de objeto plano. */
+    private fun parseTool(saida: String): Pair<String?, JSONObject> =
+        LocalCommandParser.parseTool(saida)
 
     /** Extrai {"resposta": ...} ou limpa o texto cru do modelo. */
     private fun parseResposta(saida: String): String {

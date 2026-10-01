@@ -11,8 +11,8 @@ android {
         applicationId = "com.andre.jarvisultra"
         minSdk = 26
         targetSdk = 34
-        versionCode = 50
-        versionName = "4.10.2"
+        versionCode = 51
+        versionName = "4.10.3"
     }
 
     // Assinatura FIXA (v4.7.1): toda build — sandbox, Actions ou PC — usa a mesma
@@ -54,6 +54,8 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation("com.alphacephei:vosk-android:0.3.47")
     val composeBom = platform("androidx.compose:compose-bom:2024.05.00")
     implementation(composeBom)
