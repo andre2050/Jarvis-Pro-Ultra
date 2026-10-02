@@ -3,8 +3,8 @@
 Um turno pode gerar várias rodadas: Gemini pede tools -> executamos ->
 devolvemos -> resposta final. Mesma arquitetura do Android v4.3.0.
 """
+import json
 import threading
-import time
 
 from . import gemini_client, memory, ollama_client, perception, tools
 from .adapters import normaliza_schema
@@ -70,10 +70,16 @@ class TurnResult:
         self.tools_used = tools_used
 
 
-def process(cfg: dict, history: list, user_message: str) -> TurnResult:
+def process(cfg: dict, history: list, user_message: str,
+            image_b64: str | None = None) -> TurnResult:
     """Processa uma mensagem com o cérebro ativo — Gemini (nuvem) ou Ollama
-    (100% offline). Mesmo histórico canônico; mesmo loop de function calling."""
-    history.append({"role": "user", "parts": [{"text": user_message}]})
+    (100% offline). Foto anexada só é enxergada pela NUVEM (paridade Android:
+    visão fica no Gemini)."""
+    partes_user = []
+    if image_b64:
+        partes_user.append({"inline_data": {"mime_type": "image/jpeg", "data": image_b64}})
+    partes_user.append({"text": user_message})
+    history.append({"role": "user", "parts": partes_user})
 
     memory.ensure()
     memory.log_interaction("chat", user_message[:80])
@@ -82,16 +88,25 @@ def process(cfg: dict, history: list, user_message: str) -> TurnResult:
     prompt = system_prompt() + "\n" + perception.contexto_do_computador()
     if mems:
         prompt += "\nMemórias de longo prazo sobre o senhor (use quando relevante):\n- " + "\n- ".join(mems)
+    if image_b64:
+        prompt += ("\nVISÃO: o senhor acaba de enviar uma FOTO — analise a imagem "
+                   "recebida (descreva, transcreva textos, responda a pergunta) antes de qualquer outra coisa.")
 
     # 🛰 HERMES (v5.1.0): modo orquestrador — planeja, executa e sintetiza.
     # Se qualquer coisa falhar lá dentro, retorna None e o fluxo normal segue.
-    if cfg.get("hermes_ativo"):
+    if cfg.get("hermes_ativo") and not image_b64:
         from . import hermes
         resultado = hermes.executar(cfg, history, prompt, user_message)
         if resultado is not None:
             return resultado
 
     if cfg.get("cerebro") == "ollama":
+        if image_b64:
+            history.append({"role": "model", "parts": [{"text": "(sem visão offline)"}]})
+            return TurnResult(
+                "No modo OFFLINE eu ainda não enxergo fotos, senhor — a visão "
+                "funciona no cérebro ☁ NUVEM. Troque em ⚙ CONFIG e mande a "
+                "foto de novo.", history, [])
         return _process_ollama(cfg, history, prompt)
 
     tools_used = []
@@ -130,6 +145,20 @@ def process(cfg: dict, history: list, user_message: str) -> TurnResult:
 
     return TurnResult("Cheguei ao limite de tools num único turno, senhor — que tal quebrar a pergunta?",
                       history, tools_used)
+
+
+def _limpar_resposta(texto: str) -> str:
+    """Modelos locais respondem {"resposta": "..."} — extrai o texto puro
+    (paridade com o parseResposta do Android)."""
+    t = (texto or "").strip()
+    if t.startswith("{") and t.endswith("}"):
+        try:
+            obj = json.loads(t)
+            if isinstance(obj, dict) and isinstance(obj.get("resposta"), str):
+                return obj["resposta"]
+        except Exception:
+            pass
+    return texto
 
 
 # ==================== OLLAMA (offline) ====================
@@ -176,9 +205,16 @@ def _process_ollama(cfg: dict, history: list, prompt: str) -> TurnResult:
             return TurnResult(f"Falha ao falar com o Ollama: {e}", history, tools_used)
 
         if not res["tool_calls"]:
-            texto = res["texto"] or "(silêncio pensativo...)"
-            history.append({"role": "model", "parts": [{"text": texto}]})
-            return TurnResult(texto, history, tools_used)
+            # v4.10.3-desktop: fallback do leitor JSON — modelos sem function
+            # calling nativo (gemma3, etc.) respondem {"tool": ..., "args": {...}}
+            # em texto; o parser lê chaves balanceadas com args aninhados.
+            fb = ollama_client.extrair_tool_json(res["texto"], {d["name"] for d in decls})
+            if fb:
+                res = {"texto": "", "tool_calls": [fb]}
+            else:
+                texto = _limpar_resposta(res["texto"]) or "(silêncio pensativo...)"
+                history.append({"role": "model", "parts": [{"text": texto}]})
+                return TurnResult(texto, history, tools_used)
 
         # registra as chamadas no histórico canônico (mesmo formato do Gemini)
         history.append({"role": "model", "parts": [
@@ -199,11 +235,11 @@ def _process_ollama(cfg: dict, history: list, prompt: str) -> TurnResult:
                       history, tools_used)
 
 
-def process_async(cfg: dict, history: list, user_message: str, callback):
+def process_async(cfg: dict, history: list, user_message: str, callback, image_b64=None):
     """Roda o turno numa thread; callback(TurnResult ou RuntimeError) no fim."""
     def run():
         try:
-            callback(process(cfg, history, user_message))
+            callback(process(cfg, history, user_message, image_b64))
         except Exception as e:
             callback(e)
     threading.Thread(target=run, daemon=True).start()

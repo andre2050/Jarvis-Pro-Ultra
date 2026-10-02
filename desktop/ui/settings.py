@@ -199,8 +199,9 @@ class PainelConfig(tk.Toplevel):
         self._secao("🎨 TEMA DO HUD (aplica ao reiniciar)")
         zona_t = tk.Frame(self, bg="#171012")
         zona_t.pack(fill=tk.X, padx=24)
-        self.var_tema = tk.StringVar(value=cfg.get("tema", "classico"))
-        for rot, desc in (("classico", "Azul holográfico (J.A.R.V.I.S original)"),
+        self.var_tema = tk.StringVar(value=cfg.get("tema", "busto"))
+        for rot, desc in (("busto", "Busto Holográfico wireframe (padrão v4.10.3)"),
+                          ("classico", "Azul holográfico (J.A.R.V.I.S original)"),
                           ("vermelho", "Reator de Arco Vermelho (v4.x)"),
                           ("gold", "Dourado Stark MK III"),
                           ("radar", "Holograma circular teal com sweep de radar (v5.1.0)")):

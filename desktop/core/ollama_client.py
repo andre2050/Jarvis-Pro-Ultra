@@ -58,3 +58,55 @@ def chat(modelo: str, messages: list, tools: list | None = None,
         if fn.get("name"):
             calls.append({"name": fn["name"], "args": args or {}})
     return {"texto": (msg.get("content") or "").strip(), "tool_calls": calls}
+
+
+def _objetos_json(texto: str):
+    """Gera cada substring {...} delimitada por chaves BALANCEADAS,
+    respeitando aspas e escapes (port do LocalCommandParser Android v4.10.3)."""
+    inicio = -1
+    profundidade = 0
+    em_aspas = False
+    escapado = False
+    for i, ch in enumerate(texto):
+        if profundidade == 0:
+            if ch == "{":
+                inicio, profundidade = i, 1
+                em_aspas = escapado = False
+            continue
+        if em_aspas:
+            if escapado:
+                escapado = False
+            elif ch == "\\":
+                escapado = True
+            elif ch == '"':
+                em_aspas = False
+            continue
+        if ch == '"':
+            em_aspas = True
+        elif ch == "{":
+            profundidade += 1
+        elif ch == "}":
+            profundidade -= 1
+            if profundidade == 0:
+                yield texto[inicio:i + 1]
+
+
+def extrair_tool_json(texto: str, nomes_validos: set) -> dict | None:
+    """Fallback pro Ollama sem function calling nativo (ex.: gemma3, llama2):
+    procura {"tool": "...", "args": {...}} no texto e valida nome e args.
+    Retorna {"name": str, "args": dict} ou None."""
+    for bruto in _objetos_json(texto or ""):
+        try:
+            obj = json.loads(bruto)
+        except Exception:
+            continue
+        if not isinstance(obj, dict) or "tool" not in obj:
+            continue
+        nome = obj.get("tool")
+        if not isinstance(nome, str) or nome.strip() not in nomes_validos:
+            continue
+        args = obj.get("args", {})
+        if not isinstance(args, dict):   # null/lista/número: recusa, nunca silencioso
+            continue
+        return {"name": nome.strip(), "args": args}
+    return None

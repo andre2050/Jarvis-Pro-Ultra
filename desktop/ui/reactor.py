@@ -55,12 +55,17 @@ class ArcReactorHud(tk.Canvas):
         self.thinking = False
         self.listening = False
         self.speaking = False
+        self._visema = 0.0   # v4.10.3-desktop: boca do busto anima por palavras faladas
 
         self._t0 = time.time()
         self._bat = None
         self._cpu = 0
         self._atualiza_leituras()
         self._frame()
+
+    def visema_pulso(self, forca: float = 1.0) -> None:
+        """Um evento de fala chegou — abre a boca do busto (decai sozinha)."""
+        self._visema = min(1.0, self._visema + forca)
 
     # ---------- leitura viva do computador (a cada 2s) ----------
 
@@ -89,8 +94,11 @@ class ArcReactorHud(tk.Canvas):
         # que não fosse "radar" a tela ficava em branco pra sempre e o loop
         # de animação morria (o after() de reagendamento só existia dentro
         # do if, então nunca era chamado no caso padrão).
+        self._visema = max(0.0, self._visema - 0.22)   # boca fecha em ~90ms
         if _tema.atual() == "radar":
             self._frame_radar(cx, cy, r, el)
+        elif _tema.atual() == "busto":
+            self._frame_busto(cx, cy, r, el)
         else:
             self._frame_arc(cx, cy, r, el)
 
@@ -349,3 +357,124 @@ class ArcReactorHud(tk.Canvas):
             raio = r * (0.46 + 0.03 * breathe)
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
                              outline=principal, width=2, stipple="gray50")
+
+
+    def _frame_busto(self, cx, cy, r, el):
+        """BUSTO HOLOGRÁFICO (paridade Android v4.9.3→4.10.3): capacete
+        wireframe branco-gelo, fendas de olhos luminosas, boca animada por
+        visemas, ombros com fiação tracejada e reator azul no peito."""
+        gelo = _T("vivo")        # #e0f7fa — traço principal do wireframe
+        gelo_dim = _T("dim")
+        azul = _T("principal")   # #64b5f6 — reator
+        glows = _tema.cores()["glows"]
+
+        # ---- aura quando falando ou ouvindo ----
+        if self.speaking or self.listening:
+            raio = r * (0.94 + 0.02 * math.sin(el * 6))
+            self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
+                             outline=azul, width=2, stipple="gray50")
+
+        # ---- crânio: casquete superior do capacete ----
+        top = cy - r * 0.92
+        self.create_arc(cx - r * 0.58, top, cx + r * 0.58, cy + r * 0.10,
+                         start=0, extent=180, style=tk.ARC, outline=gelo, width=2)
+        # linha da têmpora até a mandíbula (dos dois lados)
+        for lado in (-1, 1):
+            x_t = cx + lado * r * 0.58
+            self.create_line(x_t, cy - r * 0.42, x_t * 1 + lado * r * 0.02, cy + r * 0.18,
+                             fill=gelo_dim, width=1.4)
+
+        # ---- faceplate segmentado (a máscara central) ----
+        fx1, fx2 = cx - r * 0.42, cx + r * 0.42
+        fy1, fy2 = cy - r * 0.56, cy + r * 0.30
+        self.create_rectangle(fx1, fy1, fx2, fy2, outline=gelo, width=2)
+        for i in range(1, 4):  # facetas verticais suaves
+            x = fx1 + (fx2 - fx1) * i / 4
+            self.create_line(x, fy1 + r * 0.06, x, fy2 - r * 0.06,
+                            fill=gelo_dim, width=1, stipple="gray50")
+
+        # ---- olhos: fendas luminosas ----
+        for lado in (-1, 1):
+            ox = cx + lado * r * 0.20
+            self.create_polygon(ox - r * 0.13, cy - r * 0.20,
+                                ox + r * 0.10, cy - r * 0.26,
+                                ox + r * 0.13, cy - r * 0.14,
+                                ox - r * 0.10, cy - r * 0.10,
+                                fill=glows[4], outline=gelo, width=1)
+
+        # ---- boca animada por visema (o pulso vem do TTS, palavra a palavra) ----
+        boca = 4 + self._visema * r * 0.11
+        if self.speaking and self._visema < 0.15:
+            boca = 4 + r * 0.015 * (1 + math.sin(el * 18))  # micro-vibração entre palavras
+        self.create_oval(cx - r * 0.16, cy + r * 0.10 - boca / 2,
+                         cx + r * 0.16, cy + r * 0.10 + boca / 2,
+                         fill=glows[3], outline=gelo, width=1.2)
+
+        # ---- varredura quando pensando (scan subindo pelo rosto) ----
+        if self.thinking:
+            ys = fy1 + (fy2 - fy1) * ((el * 0.55) % 1.0)
+            self.create_line(fx1 - 6, ys, fx2 + 6, ys, fill=azul, width=2, stipple="gray50")
+
+        # ---- retículo tracejado quando ouvindo ----
+        if self.listening:
+            self.create_oval(cx - r * 0.70, cy - r * 0.70, cx + r * 0.70, cy + r * 0.70,
+                             outline=azul, width=1.5, stipple="gray25")
+
+        # ---- ombros e tórax com fiação tracejada ----
+        sh_y = cy + r * 0.52
+        self.create_line(cx - r * 0.95, sh_y + r * 0.38, cx - r * 0.55, sh_y,
+                         fill=gelo_dim, width=2)
+        self.create_line(cx + r * 0.95, sh_y + r * 0.38, cx + r * 0.55, sh_y,
+                         fill=gelo_dim, width=2)
+        self.create_line(cx - r * 0.55, sh_y, cx - r * 0.30, sh_y - r * 0.10,
+                         fill=gelo_dim, width=1.4)
+        self.create_line(cx + r * 0.55, sh_y, cx + r * 0.30, sh_y - r * 0.10,
+                         fill=gelo_dim, width=1.4)
+        for i in range(3):  # fiação interna do tórax (como na foto de referência)
+            y = sh_y + r * 0.08 + i * r * 0.09
+            self.create_line(cx - r * 0.40 + i * r * 0.04, y,
+                             cx - r * 0.12 - i * r * 0.03, y + r * 0.02,
+                             fill=gelo_dim, width=1, stipple="gray50")
+            self.create_line(cx + r * 0.40 - i * r * 0.04, y,
+                             cx + r * 0.12 + i * r * 0.03, y + r * 0.02,
+                             fill=gelo_dim, width=1, stipple="gray50")
+
+        # ---- reator de arco no peito: anéis concêntricos + cruz + brilho ----
+        rcx, rcy = cx, cy + r * 0.60
+        rr = r * 0.13
+        brilho = 0.55 + 0.25 * math.sin(el * 2.4) + (0.12 if self.speaking else 0)
+        self.create_oval(rcx - rr * 1.9, rcy - rr * 1.9, rcx + rr * 1.9, rcy + rr * 1.9,
+                         fill=glows[1], outline="")
+        self.create_oval(rcx - rr * 1.3, rcy - rr * 1.3, rcx + rr * 1.3, rcy + rr * 1.3,
+                         outline=azul, width=2)
+        self.create_oval(rcx - rr * 0.8, rcy - rr * 0.8, rcx + rr * 0.8, rcy + rr * 0.8,
+                         fill=glows[4], outline=gelo, width=1.5)
+        self.create_oval(rcx - rr * 0.35, rcy - rr * 0.35, rcx + rr * 0.35, rcy + rr * 0.35,
+                         fill=_cor_letra(min(1.0, brilho)), outline="")
+        for a in (0, 90, 180, 270):  # pás da cruz
+            rad = math.radians(a)
+            self.create_line(rcx + rr * 0.8 * math.cos(rad), rcy + rr * 0.8 * math.sin(rad),
+                             rcx + rr * 1.3 * math.cos(rad), rcy + rr * 1.3 * math.sin(rad),
+                             fill=gelo, width=2)
+        if self.speaking:  # anéis de energia expandindo enquanto fala
+            pulse = (el % 1.2) / 1.2
+            ra = rr * (1.3 + pulse * 1.2)
+            self.create_oval(rcx - ra, rcy - ra, rcx + ra, rcy + ra,
+                             outline=azul, width=2, stipple="gray50")
+
+        # ---- partículas subindo (mesma linguagem do modo mesa Android) ----
+        for i in range(7):
+            pr = r * (0.5 + 0.45 * ((i * 0.137 + el * 0.05) % 1.0))
+            pa = el * 0.4 + i * 2.3
+            px, py = cx + pr * math.cos(pa), cy + pr * math.sin(pa) * 0.9
+            self.create_oval(px - 1.5, py - 1.5, px + 1.5, py + 1.5,
+                             fill=gelo_dim, outline="")
+
+        # ---- bateria/hora discretos (leitura viva do PC) ----
+        txt = time.strftime("%H:%M")
+        if self._bat is not None:
+            txt += f"  ·  {self._bat}%"
+        if TEM_PSUTIL:
+            txt += f"  ·  CPU {self._cpu:.0f}%"
+        self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
+                         fill=gelo_dim)

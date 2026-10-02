@@ -3,7 +3,8 @@ import requests
 
 from version import __version__, GITHUB_REPO
 
-API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+API = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+SUFIXO_EDICAO = "-desktop"   # v4.10.3-desktop: ignora releases Android/iOS do mesmo repo
 
 
 def _parse(v: str) -> list[int]:
@@ -21,10 +22,15 @@ def _parse(v: str) -> list[int]:
 def check_latest() -> dict:
     """{'update': bool, 'latest': str, 'url': str, 'note': str}"""
     try:
-        r = requests.get(API, timeout=10, headers={"Accept": "application/vnd.github+json"})
+        r = requests.get(API + "?per_page=30", timeout=10,
+                         headers={"Accept": "application/vnd.github+json"})
         r.raise_for_status()
-        data = r.json()
-        latest = data.get("tag_name", "").lstrip("v")
+        releases = [d for d in r.json()
+                    if str(d.get("tag_name", "")).endswith(SUFIXO_EDICAO)]
+        if not releases:
+            raise RuntimeError("nenhuma release desktop publicada ainda")
+        data = releases[0]
+        latest = data.get("tag_name", "").lstrip("v").replace(SUFIXO_EDICAO, "")
         tem_update = _parse(latest) > _parse(__version__)
         return {
             "update": tem_update,

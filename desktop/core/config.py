@@ -13,7 +13,7 @@ DEFAULTS = {
     "usuario": "senhor",
     "cerebro": "gemini",       # "gemini" (nuvem) | "ollama" (100% offline)
     "ollama_model": "",        # ex: "llama3.2" — escolhido em ⚙ CONFIG
-    "tema": "radar",           # "radar" (circular, padrão) | "classico" | "vermelho" | "gold"
+    "tema": "busto",           # "busto" (padrão v4.10.3) | "radar" | "classico" | "vermelho" | "gold"
     "voz_id": "",              # v5.1.8: voz escolhida em ⚙ CONFIG ("" = automática)
 }
 

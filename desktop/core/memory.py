@@ -6,7 +6,6 @@ Fatos guardados a pedido do senhor + log de interações, em
 import json
 import re
 from datetime import datetime
-from pathlib import Path
 
 from .config import CONFIG_DIR
 

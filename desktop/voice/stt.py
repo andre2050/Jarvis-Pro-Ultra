@@ -7,7 +7,7 @@ fica desabilitado — nada quebra.
 try:
     import speech_recognition as sr
     DISPONIVEL = True
-except ImportError:
+except Exception:   # ImportError OU OSError (microfone/DLL ausente)
     sr = None
     DISPONIVEL = False
 

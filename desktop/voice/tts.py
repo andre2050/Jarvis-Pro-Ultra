@@ -72,6 +72,7 @@ def _powershell_disponivel() -> bool:
 
 class Voz:
     def __init__(self, config: dict):
+        self.on_palavra = None   # v4.10.3-desktop: visemas — pulso a cada palavra falada
         self.config = config
         self.enabled = bool(config.get("voz_ativa", True))
         self._fila: queue.Queue = queue.Queue()
@@ -180,10 +181,13 @@ class Voz:
                         engine = None
             # ---- motor 2: TTS NATIVO do Windows (fallback) ----
             if not falou:
+                self._visemas_estimadas(texto)  # nativo não tem eventos: pulsa por duração
                 ok_ps, err_ps = _tts_powershell(
                     texto,
                     float(self.config.get("voz_velocidade", 0.85)),
                     float(self.config.get("voz_volume", 1.0)))
+                if getattr(self, "_fim_visemas", None):
+                    self._fim_visemas.set()
                 if ok_ps:
                     self._ps_ok = True
                     if self._status != "ok":
@@ -193,6 +197,36 @@ class Voz:
                     self._status = "sem_voz"
                     self._erro = (f"pyttsx3: {self._erro[:80]} | "
                                   f"nativo: {err_ps[:80]}")
+
+    def _ligar_visemas(self, engine) -> None:
+        """pyttsx3 (Windows) dispara 'word' a cada palavra — vira pulso na boca.
+        Ligado UMA vez por motor (re-conectar somaria pulsos duplicados)."""
+        if getattr(self, "_engine_visemas", None) is engine:
+            return
+        try:
+            engine.connect("word", lambda nome, loc, tam: self._pulsa())
+            self._engine_visemas = engine
+        except Exception:
+            pass
+
+    def _pulsa(self) -> None:
+        try:
+            if self.on_palavra:
+                self.on_palavra()
+        except Exception:
+            pass
+
+    def _visemas_estimadas(self, texto: str) -> None:
+        """Motor nativo do Windows não tem eventos de palavra: pulsa a boca
+        por uma thread de fundo pela duração estimada da fala."""
+        import threading as _th
+        fim = _th.Event()
+
+        def pulsa():
+            while not fim.wait(0.13):
+                self._pulsa()
+        _th.Thread(target=pulsa, daemon=True).start()
+        self._fim_visemas = fim
 
     def _configurar(self, engine) -> None:
         try:

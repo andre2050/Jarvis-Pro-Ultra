@@ -36,3 +36,4 @@ pycaw;      sys_platform == "win32"
 pywin32;    sys_platform == "win32"
 pywinauto;  sys_platform == "win32"
 wmi;        sys_platform == "win32"
+Pillow>=10.0        # v4.10.3: redimensiona foto anexada pra visão

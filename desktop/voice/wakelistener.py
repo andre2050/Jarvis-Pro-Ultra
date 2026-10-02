@@ -12,7 +12,7 @@ from core import wake_word
 try:
     import sounddevice as sd
     TEM_SOUNDDEVICE = True
-except ImportError:
+except Exception:   # ImportError OU OSError (PortAudio/DLL ausente)
     TEM_SOUNDDEVICE = False
 
 

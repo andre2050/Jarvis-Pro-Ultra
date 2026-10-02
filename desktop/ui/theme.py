@@ -4,7 +4,8 @@ Temas:
   - classico  · azul holográfico do JARVIS original (Homem de Ferro)
   - vermelho  · Reator de Arco Vermelho (o clássico das versões Android)
   - gold      · dourado Stark (MK III)
-  - radar     · holograma circular teal com sweep de radar (v5.1.0) — PADRÃO do projeto desde a v5.1.4
+  - radar     · holograma circular teal com sweep de radar (v5.1.0)
+  - busto     · Busto Holográfico wireframe (v4.9.3 Android) — PADRÃO: paridade com a v4.10.3
 """
 TEMAS = {
     "classico": {
@@ -35,6 +36,17 @@ TEMAS = {
         "chat_fundo": "#0a0e18", "fg_dim": "#cfe8ea", "txt_fraco": "#7e8f96",
         "txt_claro": "#e8f2f4", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
     },
+    "busto": {
+        # portado da skin "busto" do Android v4.9.3/4.10.3: wireframe branco-gelo
+        # sobre preto, reator azul com anéis (foto novaskins.jpg do André)
+        "principal": "#64b5f6", "vivo": "#e0f7fa", "dim": "#2a5a88",
+        "escuro": "#0a1a26", "fundo": "#05080c",
+        "glows": ["#071018", "#0a1a26", "#123048", "#1d4d73", "#2a6ea8"],
+        "janela_bg": "#04070a", "painel_bg": "#081018", "painel2": "#0e1a26",
+        "entrada_bg": "#0c1826", "user_bg": "#12324a", "chat_bg": "#081018",
+        "chat_fundo": "#050a12", "fg_dim": "#d8ecf7", "txt_fraco": "#7e93a8",
+        "txt_claro": "#e8f4fc", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
+    },
     "gold": {
         "principal": "#ffb830", "vivo": "#ffd35e", "dim": "#a1730f",
         "escuro": "#3d2c07", "fundo": "#0a0805",
@@ -46,7 +58,7 @@ TEMAS = {
     },
 }
 
-_ativo = "radar"  # v5.1.4: holograma circular passa a ser o padrão do projeto
+_ativo = "busto"  # v4.10.3-desktop: busto holográfico do Android vira o padrão
 
 
 def usar(nome: str) -> None:

@@ -165,6 +165,13 @@ class JarvisApp(tk.Tk):
         self.entrada.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(12, 8), pady=10, ipady=8)
         self.entrada.bind("<Return>", lambda e: self._enviar())
 
+        # v4.10.3-desktop: anexar FOTO -> visão (nuvem Gemini), como no Android
+        self._foto_b64 = None
+        self.btn_foto = tk.Button(barra, text="＋", command=self._anexar_foto,
+                                  bg=self.cor("painel2"), fg=self.cor("vivo"), bd=0,
+                                  font=("Segoe UI", 13), cursor="hand2")
+        self.btn_foto.pack(side=tk.LEFT, padx=(0, 6), pady=6)
+
         if stt.DISPONIVEL:
             self.btn_mic = tk.Button(barra, text="🎙", command=lambda: self._ouvir(pausar_wake=True),
                                      bg=self.cor("painel2"), fg=self.cor("vivo"), bd=0,
@@ -175,6 +182,7 @@ class JarvisApp(tk.Tk):
                   cursor="hand2").pack(side=tk.LEFT, padx=(0, 10), pady=8)
 
         self._atualiza_botao_wake()
+        self.voz.on_palavra = self.reator.visema_pulso
 
     # ==================== STATUS / HUD ====================
 
@@ -297,6 +305,8 @@ class JarvisApp(tk.Tk):
 
     def _enviar(self, texto: str | None = None):
         msg = (texto or self.entrada.get()).strip()
+        if not msg and self._foto_b64:
+            msg = "Analise esta foto, senhor."
         if not msg or self._ocupado:
             return
         if self.cfg.get("cerebro") == "ollama":
@@ -307,7 +317,10 @@ class JarvisApp(tk.Tk):
             self._abrir_config()
             return
         self.entrada.delete(0, tk.END)
-        self.chat.add("user", msg)
+        self.chat.add("user", ("📷 " if self._foto_b64 else "") + msg)
+        foto = self._foto_b64
+        self._foto_b64 = None
+        self.btn_foto.config(fg=self.cor("vivo"))
         self._ocupado = True
         self._status("pensando", pensando=True)
         self.chat.mostrar_digitando()
@@ -315,7 +328,38 @@ class JarvisApp(tk.Tk):
         def retorno(resultado):
             self.fila_eventos.put(resultado)
 
-        brain.process_async(self.cfg, self.historico, msg, retorno)
+        brain.process_async(self.cfg, self.historico, msg, retorno, image_b64=foto)
+
+    def _anexar_foto(self):
+        """Escolhe uma foto do PC, redimensiona pra caber no Gemini e anexa
+        ao próximo envio (visão funciona no cérebro ☁ NUVEM)."""
+        from tkinter import filedialog
+        caminho = filedialog.askopenfilename(
+            title="Anexar foto pro J.A.R.V.I.S",
+            filetypes=[("Imagens", "*.jpg *.jpeg *.png *.webp *.bmp"), ("Todos", "*.*")])
+        if not caminho:
+            return
+        try:
+            from PIL import Image
+        except ImportError:
+            messagebox.showerror(
+                "Pillow ausente",
+                "Pra redimensionar a foto eu preciso do Pillow, senhor.\n\n"
+                "Rode:  pip install Pillow")
+            return
+        try:
+            with Image.open(caminho) as im:
+                im = im.convert("RGB")
+                im.thumbnail((1024, 1024))
+                import base64, io
+                buf = io.BytesIO()
+                im.save(buf, "JPEG", quality=85)
+                self._foto_b64 = base64.b64encode(buf.getvalue()).decode()
+        except Exception as e:
+            messagebox.showerror("Foto inválida", f"Não consegui abrir essa imagem: {e}")
+            return
+        self.btn_foto.config(fg=self.cor("principal"))
+        self.entrada.focus_set()
 
     def _ouvir(self, pausar_wake: bool = False):
         if self._ocupado:
@@ -358,6 +402,7 @@ class JarvisApp(tk.Tk):
             self.chat.add("sistema", "Wake word não instalado — instale em ⚙ CONFIG → WAKE WORD (um clique).")
             self._abrir_config()
         self._atualiza_botao_wake()
+        self.voz.on_palavra = self.reator.visema_pulso
 
     # ---- fala intermediária das ações (instant acknowledgment) ----
 
@@ -469,6 +514,7 @@ class JarvisApp(tk.Tk):
         self.btn_voz.config(text=f"🎙 VOZ {'ON' if self.voz.enabled else 'OFF'}",
                             fg=self.cor("vivo") if self.voz.enabled else self.cor("txt_fraco"))
         self._atualiza_botao_wake()
+        self.voz.on_palavra = self.reator.visema_pulso
 
     def _sair(self):
         try:

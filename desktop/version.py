@@ -1,11 +1,13 @@
-"""Jarvis Pro Ultra — Edição Desktop (v5.0.0 · Ollama offline).
+"""Jarvis Pro Ultra — Edição Desktop (v4.10.3 · paridade com o Android).
 
-Reator de Arco Vermelho (v4.3.0 Android) + fusão com o Mark LIII: wake word
-neural local "Hey Jarvis", 16 ações auto-descritivas, undo e confirmação real.
+Mesmo assistente da v4.10.3 Android: busto holográfico wireframe com boca
+animada por visemas, cérebro dual (Gemini nuvem / Ollama 100% offline com
+leitor JSON robusto), visão por foto anexada, memórias, wake word local,
+push-to-talk e atualizador que só olha releases -desktop.
 Executa com:  python main.py
 """
 
 APP_NAME = "J.A.R.V.I.S — Pro Ultra Desktop"
-__version__ = "5.1.9"
+__version__ = "4.10.3"
 OWNER = "André Luiz Lima Menezes"  # dono do projeto
 GITHUB_REPO = "andre2050/Jarvis-Pro-Ultra"
