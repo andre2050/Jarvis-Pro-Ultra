@@ -5,7 +5,8 @@ Temas:
   - vermelho  · Reator de Arco Vermelho (o clássico das versões Android)
   - gold      · dourado Stark (MK III)
   - radar     · holograma circular teal com sweep de radar (v5.1.0)
-  - busto     · Busto Holográfico wireframe (v4.9.3 Android) — PADRÃO: paridade com a v4.10.3
+  - busto     · Busto Holográfico wireframe gelo/azul (v4.9.3 Android)
+  - novoskin  · Busto Holográfico cyan/teal com painel HUD lateral (02/10/2026) — PADRÃO
 """
 TEMAS = {
     "classico": {
@@ -47,6 +48,18 @@ TEMAS = {
         "chat_fundo": "#050a12", "fg_dim": "#d8ecf7", "txt_fraco": "#7e93a8",
         "txt_claro": "#e8f4fc", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
     },
+    "novoskin": {
+        # pedido do André (foto novoskin.jpg): capacete wireframe cyan/teal
+        # vibrante sobre preto puro, reator com brilho branco-ciano no peito
+        # e painel HUD de círculos na lateral direita
+        "principal": "#19c7d6", "vivo": "#5fe8f0", "dim": "#0d6e78",
+        "escuro": "#06292e", "fundo": "#010304",
+        "glows": ["#031a1d", "#06292e", "#0d6e78", "#19c7d6", "#8df3f8"],
+        "janela_bg": "#000202", "painel_bg": "#040c0d", "painel2": "#081618",
+        "entrada_bg": "#061214", "user_bg": "#0d2e32", "chat_bg": "#040c0d",
+        "chat_fundo": "#020607", "fg_dim": "#cdf6f8", "txt_fraco": "#6f9598",
+        "txt_claro": "#e5fcfd", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
+    },
     "gold": {
         "principal": "#ffb830", "vivo": "#ffd35e", "dim": "#a1730f",
         "escuro": "#3d2c07", "fundo": "#0a0805",
@@ -58,7 +71,7 @@ TEMAS = {
     },
 }
 
-_ativo = "busto"  # v4.10.3-desktop: busto holográfico do Android vira o padrão
+_ativo = "novoskin"  # 02/10/2026: skin cyan/teal pedida pelo André vira o padrão
 
 
 def usar(nome: str) -> None:

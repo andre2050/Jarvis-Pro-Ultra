@@ -8,6 +8,14 @@ Cadeia de motores (v5.1.9 — "o JARVIS nunca fica mudo"):
 Se o pyttsx3 não estiver instalado ou o driver engasgar (caso comum em
 builds .exe ou Windows sem pywin32), cada fala cai pro fallback nativo
 automaticamente. Em último caso, a UI avisa o motivo exato.
+
+v4.10.4: CORRIGIDO o bug "fala uma vez e para" — pyttsx3 reutilizando o
+MESMO objeto engine pra várias falas é um bug conhecido do driver SAPI5 no
+Windows (e do espeak no Linux): depois do primeiro runAndWait() o laço
+interno do driver não reinicia e as falas seguintes saem mudas, sem
+exceção nenhuma (então o código antigo nunca caía no fallback). Fix: cria
+um engine NOVO pra cada fala e descarta no fim (engine.stop() + del) —
+é o workaround oficial do próprio mantenedor do pyttsx3 pra esse bug.
 """
 import queue
 import subprocess
@@ -84,6 +92,7 @@ class Voz:
         self.vozes = []          # v5.1.8: vozes do sistema (preenchido pelo engine)
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+        self._sondar_vozes()  # catálogo pra UI, sem guardar o engine (descartável)
 
     def reconfigurar(self) -> None:
         """Reaplica a config no engine em uso (voz escolhida, velocidade) —
@@ -138,47 +147,53 @@ class Voz:
 
     # ---------- engine ----------
 
-    def _loop(self) -> None:
+    def _sondar_vozes(self) -> None:
+        """Pega o catálogo de vozes do sistema UMA vez pra UI (⚙ CONFIG),
+        num engine descartável — não é o engine usado pra falar depois."""
         if not TEM_PYTTSX3:
             self._status = "sem_biblioteca"
-        engine = None
-        if TEM_PYTTSX3:
+            return
+        try:
+            sonda = pyttsx3.init()
+            self._configurar(sonda)
+            self._status, self._erro = "ok", ""
             try:
-                engine = pyttsx3.init()
-                self._configurar(engine)
-                self._status, self._erro = "ok", ""
-            except Exception as e:
-                engine = None
-                self._status, self._erro = "erro_engine", str(e)
+                sonda.stop()
+            except Exception:
+                pass
+            del sonda
+        except Exception as e:
+            self._status, self._erro = "erro_engine", str(e)
+
+    def _loop(self) -> None:
         while True:
             texto = self._fila.get()
             if texto == "__reconfigurar__":
-                if engine is not None:
-                    self._configurar(engine)
+                self._sondar_vozes()  # só pra atualizar status/vozes; nada fica retido
                 continue
-            # ---- motor 1: pyttsx3 ----
+            # ---- motor 1: pyttsx3 (engine NOVO a cada fala — ver nota da v4.10.4) ----
             falou = False
-            if engine is None and TEM_PYTTSX3:
-                # v5.1.7: tenta reerguer o motor a cada fala perdida
+            if TEM_PYTTSX3:
+                engine = None
                 try:
                     engine = pyttsx3.init()
                     self._configurar(engine)
-                    self._status, self._erro = "ok", ""
-                except Exception as e:
-                    engine = None
-                    self._status, self._erro = "erro_engine", str(e)
-            if engine is not None:
-                try:
+                    self._ligar_visemas(engine)
                     engine.say(texto)
                     engine.runAndWait()
                     falou = True
+                    self._status, self._erro = "ok", ""
                 except Exception as e:
                     self._status, self._erro = "erro_engine", str(e)
-                    try:
-                        engine = pyttsx3.init()
-                        self._configurar(engine)
-                    except Exception:
-                        engine = None
+                finally:
+                    if engine is not None:
+                        try:
+                            engine.stop()
+                        except Exception:
+                            pass
+                        del engine
+            else:
+                self._status = "sem_biblioteca"
             # ---- motor 2: TTS NATIVO do Windows (fallback) ----
             if not falou:
                 self._visemas_estimadas(texto)  # nativo não tem eventos: pulsa por duração
@@ -199,13 +214,10 @@ class Voz:
                                   f"nativo: {err_ps[:80]}")
 
     def _ligar_visemas(self, engine) -> None:
-        """pyttsx3 (Windows) dispara 'word' a cada palavra — vira pulso na boca.
-        Ligado UMA vez por motor (re-conectar somaria pulsos duplicados)."""
-        if getattr(self, "_engine_visemas", None) is engine:
-            return
+        """pyttsx3 dispara 'word' a cada palavra — vira pulso na boca.
+        v4.10.4: engine é novo a cada fala, então conecta sempre (sem guard)."""
         try:
             engine.connect("word", lambda nome, loc, tam: self._pulsa())
-            self._engine_visemas = engine
         except Exception:
             pass
 

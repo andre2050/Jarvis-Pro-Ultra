@@ -99,6 +99,8 @@ class ArcReactorHud(tk.Canvas):
             self._frame_radar(cx, cy, r, el)
         elif _tema.atual() == "busto":
             self._frame_busto(cx, cy, r, el)
+        elif _tema.atual() == "novoskin":
+            self._frame_busto(cx, cy, r, el, painel_lateral=True)
         else:
             self._frame_arc(cx, cy, r, el)
 
@@ -359,7 +361,7 @@ class ArcReactorHud(tk.Canvas):
                              outline=principal, width=2, stipple="gray50")
 
 
-    def _frame_busto(self, cx, cy, r, el):
+    def _frame_busto(self, cx, cy, r, el, painel_lateral=False):
         """BUSTO HOLOGRÁFICO (paridade Android v4.9.3→4.10.3): capacete
         wireframe branco-gelo, fendas de olhos luminosas, boca animada por
         visemas, ombros com fiação tracejada e reator azul no peito."""
@@ -478,3 +480,17 @@ class ArcReactorHud(tk.Canvas):
             txt += f"  ·  CPU {self._cpu:.0f}%"
         self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
                          fill=gelo_dim)
+
+        # ---- painel HUD lateral (skin "novoskin": coluna de círculos à direita,
+        # como na foto de referência do André) ----
+        if painel_lateral:
+            px = self.size * 0.94
+            py0 = cy - r * 0.55
+            for i in range(4):
+                py = py0 + i * r * 0.26
+                aceso = (int(el * 1.3) + i) % 4 == 0  # um círculo "pisca" por vez
+                self.create_oval(px - 7, py - 7, px + 7, py + 7,
+                                 outline=azul, width=1.5,
+                                 fill=(glows[3] if aceso else ""))
+            self.create_line(px, py0 - r * 0.12, px, py0 + 3 * r * 0.26 + r * 0.12,
+                             fill=gelo_dim, width=1)
