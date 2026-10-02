@@ -20,11 +20,21 @@ DEFAULTS = {
 
 def load() -> dict:
     cfg = dict(DEFAULTS)
+    existia = False
     try:
         if CONFIG_FILE.exists():
+            existia = True
             cfg.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8")))
     except Exception:
         pass
+    # v4.10.4: André pediu a skin "novoskin" (foto de referência) no lugar da
+    # "busto" que virou padrão sozinha na v4.10.3 — quem só tinha esse valor
+    # AUTOMÁTICO (nunca escolheu de propósito em ⚙ CONFIG) migra uma vez só.
+    # Depois da migração, qualquer escolha feita em CONFIG (inclusive voltar
+    # pra "busto") fica intocada pra sempre.
+    if existia and not cfg.get("_skin_migrada_v4104") and cfg.get("tema") == "busto":
+        cfg["tema"] = "novoskin"
+    cfg["_skin_migrada_v4104"] = True
     return cfg
 
 
