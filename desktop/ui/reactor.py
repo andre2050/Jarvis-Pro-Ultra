@@ -14,12 +14,30 @@ central. Mesmos estados (pensando/ouvindo/falando) do reator.
 import math
 import time
 import tkinter as tk
+from pathlib import Path
 
 try:
     import psutil
     TEM_PSUTIL = True
 except ImportError:
     TEM_PSUTIL = False
+
+try:
+    from PIL import Image, ImageTk
+    TEM_PIL = True
+except ImportError:
+    TEM_PIL = False
+
+# v4.10.9: arte gerada por IA pra skin "novoskin" (fiel à foto de referência
+# do André) — ver assets/README.md. Caminho relativo ao projeto desktop/.
+_ASSET_NOVOSKIN = Path(__file__).resolve().parent.parent / "assets" / "novoskin_bust.png"
+# posições relativas (0..1 da imagem) calibradas por análise de pixel da arte:
+# olho esquerdo, olho direito, reator do peito. Boca é estimativa (a arte não
+# tem boca visível — visor fechado — mas o HUD precisa animar fala).
+_NOVOSKIN_OLHO_E = (0.400, 0.309)
+_NOVOSKIN_OLHO_D = (0.605, 0.309)
+_NOVOSKIN_REATOR = (0.499, 0.812)
+_NOVOSKIN_BOCA = (0.502, 0.400)
 
 # v5.0.0: cores vêm do tema ativo (ui/theme.py) — azul clássico, vermelho ou gold
 from ui import theme as _tema
@@ -56,6 +74,8 @@ class ArcReactorHud(tk.Canvas):
         self.listening = False
         self.speaking = False
         self._visema = 0.0   # v4.10.3-desktop: boca do busto anima por palavras faladas
+        self._img_novoskin = None    # v4.10.9: cache do PhotoImage (lazy, 1x por tamanho)
+        self._img_novoskin_erro = False
 
         self._t0 = time.time()
         self._bat = None
@@ -361,140 +381,109 @@ class ArcReactorHud(tk.Canvas):
                              outline=principal, width=2, stipple="gray50")
 
 
+    def _carregar_novoskin(self):
+        """Carrega a arte da novoskin UMA vez por tamanho de canvas (lazy).
+        Se Pillow ou o arquivo faltarem, cai pro desenho vetorial antigo —
+        nunca quebra a tela."""
+        if self._img_novoskin is not None or self._img_novoskin_erro:
+            return self._img_novoskin
+        if not TEM_PIL or not _ASSET_NOVOSKIN.exists():
+            self._img_novoskin_erro = True
+            return None
+        try:
+            im = Image.open(_ASSET_NOVOSKIN).convert("RGB")
+            im = im.resize((int(self.size), int(self.size)), Image.LANCZOS)
+            self._img_novoskin = ImageTk.PhotoImage(im)
+        except Exception:
+            self._img_novoskin_erro = True
+            self._img_novoskin = None
+        return self._img_novoskin
+
     def _frame_novoskin(self, cx, cy, r, el):
-        """NOVOSKIN (02/10/2026, foto de referência do André): o MESMO busto
-        wireframe, mas com acabamento mais fiel à foto — olhos em fenda fina
-        (não bloco sólido), boca em grade visor, reator com núcleo em camadas
-        + faíscas, e o painel HUD de círculos na lateral direita."""
+        """NOVOSKIN (v4.10.9): arte gerada por IA a partir da foto de
+        referência do André (busto wireframe teal/cyan, reator triangular,
+        painel HUD lateral) como imagem de fundo, com os overlays
+        animados do JARVIS (olhos, boca por visema, reator pulsante,
+        varredura pensando/ouvindo) desenhados por cima nas posições
+        calibradas por análise de pixel da própria arte. Sem Pillow ou
+        sem o arquivo, degrada pro busto vetorial clássico."""
+        img = self._carregar_novoskin()
+        if img is None:
+            self._frame_busto(cx, cy, r, el, painel_lateral=True)
+            return
+
         gelo = _T("vivo")
-        gelo_dim = _T("dim")
         azul = _T("principal")
         glows = _tema.cores()["glows"]
+        tam = self.size
+
+        self.create_image(cx, cy, image=img)  # arte de base (anchor=center)
 
         if self.speaking or self.listening:
             raio = r * (0.94 + 0.02 * math.sin(el * 6))
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
                              outline=azul, width=2, stipple="gray50")
 
-        # ---- crânio + têmporas (igual ao busto clássico) ----
-        top = cy - r * 0.92
-        self.create_arc(cx - r * 0.58, top, cx + r * 0.58, cy + r * 0.10,
-                         start=0, extent=180, style=tk.ARC, outline=gelo, width=2)
-        for lado in (-1, 1):
-            x_t = cx + lado * r * 0.58
-            self.create_line(x_t, cy - r * 0.42, x_t + lado * r * 0.02, cy + r * 0.18,
-                             fill=gelo_dim, width=1.4)
-            # aleta/antena lateral saindo da têmpora (como na foto)
-            self.create_line(x_t, cy - r * 0.42, x_t + lado * r * 0.16, cy - r * 0.58,
-                             fill=gelo_dim, width=1.2)
+        # ---- olhos: brilho pulsante nas posições calibradas da arte ----
+        pulso_olho = 0.5 + 0.5 * math.sin(el * 2.2)
+        if self.thinking or self.listening:
+            pulso_olho = 0.7 + 0.3 * math.sin(el * 5)
+        rr_olho = tam * (0.028 + 0.006 * pulso_olho)
+        for (nx, ny) in (_NOVOSKIN_OLHO_E, _NOVOSKIN_OLHO_D):
+            ox, oy = nx * tam, ny * tam
+            self.create_oval(ox - rr_olho, oy - rr_olho, ox + rr_olho, oy + rr_olho,
+                             fill=glows[4], outline="", stipple="gray50")
+            self.create_oval(ox - rr_olho * 0.45, oy - rr_olho * 0.45,
+                             ox + rr_olho * 0.45, oy + rr_olho * 0.45,
+                             fill=gelo, outline="")
 
-        # ---- faceplate com cristas diagonais (facetado, não só vertical) ----
-        fx1, fx2 = cx - r * 0.42, cx + r * 0.42
-        fy1, fy2 = cy - r * 0.56, cy + r * 0.30
-        self.create_rectangle(fx1, fy1, fx2, fy2, outline=gelo, width=2)
-        for i in range(1, 4):
-            x = fx1 + (fx2 - fx1) * i / 4
-            self.create_line(x, fy1 + r * 0.06, x, fy2 - r * 0.06,
-                            fill=gelo_dim, width=1, stipple="gray50")
-        for sinal in (-1, 1):  # cristas diagonais saindo do centro da testa
-            self.create_line(cx, fy1 + r * 0.05,
-                             cx + sinal * r * 0.30, fy1 + r * 0.22,
-                             fill=gelo_dim, width=1, stipple="gray50")
-
-        # ---- olhos: fenda fina luminosa com halo (não bloco sólido) ----
-        for lado in (-1, 1):
-            ox = cx + lado * r * 0.20
-            x1, y1 = ox - lado * r * 0.12, cy - r * 0.23
-            x2, y2 = ox + lado * r * 0.12, cy - r * 0.15
-            self.create_line(x1, y1, x2, y2, fill=glows[4], width=5, capstyle=tk.ROUND)
-            self.create_line(x1, y1, x2, y2, fill=gelo, width=2, capstyle=tk.ROUND)
-
-        # ---- boca: grade visor fina (3 ripas) que se abre com o visema ----
-        boca = 2 + self._visema * r * 0.09
+        # ---- boca: grade visor fina que se abre com o visema ----
+        boca = 2 + self._visema * r * 0.10
         if self.speaking and self._visema < 0.15:
             boca = 2 + r * 0.012 * (1 + math.sin(el * 18))
-        bx1, bx2 = cx - r * 0.15, cx + r * 0.15
-        by = cy + r * 0.10
+        bmx, bmy = _NOVOSKIN_BOCA[0] * tam, _NOVOSKIN_BOCA[1] * tam
+        bx1, bx2 = bmx - r * 0.14, bmx + r * 0.14
         for i in range(3):
-            yy = by - boca + i * boca
+            yy = bmy - boca + i * boca
             self.create_line(bx1, yy, bx2, yy, fill=glows[3], width=2)
 
         if self.thinking:
-            ys = fy1 + (fy2 - fy1) * ((el * 0.55) % 1.0)
-            self.create_line(fx1 - 6, ys, fx2 + 6, ys, fill=azul, width=2, stipple="gray50")
+            ys = (_NOVOSKIN_OLHO_E[1] * tam) + ((_NOVOSKIN_REATOR[1] - _NOVOSKIN_OLHO_E[1]) * tam) * ((el * 0.4) % 1.0)
+            self.create_line(cx - r * 0.45, ys, cx + r * 0.45, ys,
+                             fill=azul, width=2, stipple="gray50")
         if self.listening:
             self.create_oval(cx - r * 0.70, cy - r * 0.70, cx + r * 0.70, cy + r * 0.70,
                              outline=azul, width=1.5, stipple="gray25")
 
-        # ---- ombros/tórax com fiação (igual ao busto) ----
-        sh_y = cy + r * 0.52
-        self.create_line(cx - r * 0.95, sh_y + r * 0.38, cx - r * 0.55, sh_y,
-                         fill=gelo_dim, width=2)
-        self.create_line(cx + r * 0.95, sh_y + r * 0.38, cx + r * 0.55, sh_y,
-                         fill=gelo_dim, width=2)
-        self.create_line(cx - r * 0.55, sh_y, cx - r * 0.30, sh_y - r * 0.10,
-                         fill=gelo_dim, width=1.4)
-        self.create_line(cx + r * 0.55, sh_y, cx + r * 0.30, sh_y - r * 0.10,
-                         fill=gelo_dim, width=1.4)
-        for i in range(3):
-            y = sh_y + r * 0.08 + i * r * 0.09
-            self.create_line(cx - r * 0.40 + i * r * 0.04, y,
-                             cx - r * 0.12 - i * r * 0.03, y + r * 0.02,
-                             fill=gelo_dim, width=1, stipple="gray50")
-            self.create_line(cx + r * 0.40 - i * r * 0.04, y,
-                             cx + r * 0.12 + i * r * 0.03, y + r * 0.02,
-                             fill=gelo_dim, width=1, stipple="gray50")
-
-        # ---- reator: núcleo em camadas + hexágono + faíscas (mais denso que o busto) ----
-        rcx, rcy = cx, cy + r * 0.60
-        rr = r * 0.14
+        # ---- reator: pulso + anel de energia na posição calibrada ----
+        rcx, rcy = _NOVOSKIN_REATOR[0] * tam, _NOVOSKIN_REATOR[1] * tam
+        rr = r * 0.10
         brilho = 0.55 + 0.25 * math.sin(el * 2.4) + (0.12 if self.speaking else 0)
-        self.create_oval(rcx - rr * 2.2, rcy - rr * 2.2, rcx + rr * 2.2, rcy + rr * 2.2,
-                         fill=glows[1], outline="")
-        self.create_oval(rcx - rr * 1.5, rcy - rr * 1.5, rcx + rr * 1.5, rcy + rr * 1.5,
-                         outline=gelo_dim, width=1)
-        self.create_oval(rcx - rr * 1.15, rcy - rr * 1.15, rcx + rr * 1.15, rcy + rr * 1.15,
-                         outline=azul, width=2)
-        hexa = []  # hexágono interno (núcleo facetado como na foto)
-        for i in range(6):
-            a = math.radians(60 * i + 90 + el * 8)
-            hexa.append((rcx + rr * 0.85 * math.cos(a), rcy + rr * 0.85 * math.sin(a)))
-        self.create_polygon(*hexa, outline=gelo, fill=glows[4], width=1.3)
-        self.create_oval(rcx - rr * 0.32, rcy - rr * 0.32, rcx + rr * 0.32, rcy + rr * 0.32,
+        self.create_oval(rcx - rr * 1.6, rcy - rr * 1.6, rcx + rr * 1.6, rcy + rr * 1.6,
+                         fill=glows[1], outline="", stipple="gray50")
+        self.create_oval(rcx - rr * 0.4, rcy - rr * 0.4, rcx + rr * 0.4, rcy + rr * 0.4,
                          fill=_cor_letra(min(1.0, brilho)), outline="")
-        for a in (0, 90, 180, 270):
-            rad = math.radians(a)
-            self.create_line(rcx + rr * 0.85 * math.cos(rad), rcy + rr * 0.85 * math.sin(rad),
-                             rcx + rr * 1.5 * math.cos(rad), rcy + rr * 1.5 * math.sin(rad),
-                             fill=gelo, width=1.6)
-        for i in range(5):  # faíscas ao redor do núcleo
-            a = el * 1.3 + i * (360 / 5) * math.pi / 180
-            pr = rr * (1.7 + 0.15 * math.sin(el * 3 + i))
-            px, py = rcx + pr * math.cos(a), rcy + pr * math.sin(a)
-            self.create_oval(px - 1.3, py - 1.3, px + 1.3, py + 1.3, fill=glows[3], outline="")
         if self.speaking:
             pulse = (el % 1.2) / 1.2
-            ra = rr * (1.5 + pulse * 1.3)
+            ra = rr * (1.3 + pulse * 1.4)
             self.create_oval(rcx - ra, rcy - ra, rcx + ra, rcy + ra,
                              outline=azul, width=2, stipple="gray50")
+        for i in range(5):
+            a = el * 1.3 + i * (360 / 5) * math.pi / 180
+            pr = rr * (1.8 + 0.15 * math.sin(el * 3 + i))
+            px, py = rcx + pr * math.cos(a), rcy + pr * math.sin(a)
+            self.create_oval(px - 1.3, py - 1.3, px + 1.3, py + 1.3, fill=glows[3], outline="")
 
+        # ---- partículas subindo ----
         for i in range(7):
             pr = r * (0.5 + 0.45 * ((i * 0.137 + el * 0.05) % 1.0))
             pa = el * 0.4 + i * 2.3
             px, py = cx + pr * math.cos(pa), cy + pr * math.sin(pa) * 0.9
             self.create_oval(px - 1.5, py - 1.5, px + 1.5, py + 1.5,
-                             fill=gelo_dim, outline="")
+                             fill=glows[2], outline="")
 
-        txt = time.strftime("%H:%M")
-        if self._bat is not None:
-            txt += f"  ·  {self._bat}%"
-        else:
-            txt += f"  ·  CPU {self._cpu:.0f}%"
-        self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
-                         fill=gelo_dim)
-
-        # ---- painel HUD lateral: coluna de círculos à direita (foto do André) ----
-        px = self.size * 0.94
+        # ---- painel HUD lateral: coluna de círculos (igual à foto) ----
+        px = tam * 0.94
         py0 = cy - r * 0.55
         for i in range(4):
             py = py0 + i * r * 0.26
@@ -503,7 +492,15 @@ class ArcReactorHud(tk.Canvas):
                              outline=azul, width=1.5,
                              fill=(glows[3] if aceso else ""))
         self.create_line(px, py0 - r * 0.12, px, py0 + 3 * r * 0.26 + r * 0.12,
-                         fill=gelo_dim, width=1)
+                         fill=_T("dim"), width=1)
+
+        txt = time.strftime("%H:%M")
+        if self._bat is not None:
+            txt += f"  ·  {self._bat}%"
+        else:
+            txt += f"  ·  CPU {self._cpu:.0f}%"
+        self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
+                         fill=_T("dim"))
 
     def _frame_busto(self, cx, cy, r, el, painel_lateral=False):
         """BUSTO HOLOGRÁFICO (paridade Android v4.9.3→4.10.3): capacete
