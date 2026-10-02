@@ -472,10 +472,15 @@ class JarvisApp(tk.Tk):
 
     # ==================== VOZ / CONFIG ====================
 
-    def _checar_voz_inicial(self):
+    def _checar_voz_inicial(self, tentativa=0):
         """v5.1.7: se o JARVIS não consegue FALAR, o usuário fica sabendo
-        na hora — nunca mais silêncio sem explicação."""
+        na hora — nunca mais silêncio sem explicação.
+        v4.10.8: enquanto a sonda do boot não termina, o estado é
+        "verificando" — re-checa em vez de acusar problema falso."""
         ok, motivo = self.voz.estado()
+        if ok and motivo == "verificando" and tentativa < 15:
+            self.after(600, lambda: self._checar_voz_inicial(tentativa + 1))
+            return
         if not ok:
             self.chat.add("sistema",
                           f"🎙 AVISO: não consigo falar em voz alta — {motivo}. "
