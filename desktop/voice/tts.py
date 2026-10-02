@@ -1,9 +1,12 @@
 """Voz do JARVIS (TTS) — pyttsx3 offline com fallback NATIVO do Windows.
 
-Cadeia de motores (v5.1.9 — "o JARVIS nunca fica mudo"):
-  1. pyttsx3 (vozes do sistema, config de velocidade/voz escolhida)
-  2. PowerShell + System.Speech — TTS NATIVO do Windows, funciona sem
-     instalar NADA (é a mesma engine do Windows, chamada direta)
+Cadeia de motores (v4.10.6 — "o JARVIS nunca fica mudo"):
+  Windows:
+    1. PowerShell + System.Speech — TTS NATIVO do Windows (PRINCIPAL; é o
+       motor que provou funcionar na máquina do André, linha 5.1.9)
+    2. pyttsx3 (reserva — desligue "voz nativa" no CONFIG pra usá-lo)
+  Linux/Mac:
+    1. pyttsx3 (vozes do sistema, config de velocidade/voz escolhida)
 
 Se o pyttsx3 não estiver instalado ou o driver engasgar (caso comum em
 builds .exe ou Windows sem pywin32), cada fala cai pro fallback nativo
@@ -90,9 +93,10 @@ class Voz:
         self._erro = ""
         self._ps_ok = None       # cache da sonda do TTS nativo do Windows
         self.vozes = []          # v5.1.8: vozes do sistema (preenchido pelo engine)
+        self._motor = ""         # "" | "nativo" | "pyttsx3" — quem falou por último
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
-        self._sondar_vozes()  # catálogo pra UI, sem guardar o engine (descartável)
+        self._fila.put("__sondar__")  # v4.10.6: sonda roda NA THREAD da voz
 
     def reconfigurar(self) -> None:
         """Reaplica a config no engine em uso (voz escolhida, velocidade) —
@@ -100,14 +104,20 @@ class Voz:
         self._fila.put("__reconfigurar__")
 
     def estado(self) -> tuple:
-        """(pode_falar, motivo) — diagnóstico honesto pra UI avisar o usuário.
-
-        v5.1.9: com o fallback nativo do Windows, pyttsx3 quebrado NÃO significa
-        mudo — o motivo diz por qual motor ele está falando.
-        """
+        """(pode_falar, motivo) — diagnóstico honesto pra UI avisar o usuário."""
+        if self._motor == "nativo" and self._ps_ok:
+            return True, "voz nativa do Windows"
+        if self._motor == "pyttsx3" and self._status == "ok":
+            return True, "ok"
+        # nada falou ainda nesta sessão: vê o que estaria disponível agora
+        if sys.platform.startswith("win"):
+            if self._ps_ok is None:
+                self._ps_ok = _powershell_disponivel()
+            if self._ps_ok:
+                return True, "voz nativa do Windows"
         if self._status == "ok":
             return True, "ok"
-        if self._status == "iniciando" and not TEM_PYTTSX3:
+        if self._status == "iniciando" and not TEM_PYTTSX3 and not self._ps_ok:
             self._status = "sem_biblioteca"
         if self._status == "iniciando":
             return False, "motor de voz ainda inicializando…"
@@ -116,8 +126,7 @@ class Voz:
         if self._ps_ok is None:
             self._ps_ok = _powershell_disponivel()
         if self._ps_ok:
-            return True, (f"falando pela VOZ NATIVA DO WINDOWS "
-                          f"({motivo_py} — dá pra melhorar com o botão de instalar)")
+            return True, f"voz nativa do Windows ({motivo_py})"
         return False, f"nenhum motor de voz funciona ({motivo_py} | voz nativa indisponível)"
 
     # ---------- API ----------
@@ -165,53 +174,75 @@ class Voz:
         except Exception as e:
             self._status, self._erro = "erro_engine", str(e)
 
+    # ---------- motores ----------
+
+    def _nativo_preferido(self) -> bool:
+        """No Windows, a VOZ NATIVA (System.Speech) é o motor principal."""
+        return (sys.platform.startswith("win")
+                and bool(self.config.get("voz_natwin", True)))
+
+    def _falar_nativo(self, texto: str) -> bool:
+        """TTS nativo do Windows (System.Speech via PowerShell) — o motor que
+        já provou funcionar na máquina do André (linha 5.1.9)."""
+        if not sys.platform.startswith("win"):
+            return False
+        if self._ps_ok is None:
+            self._ps_ok = _powershell_disponivel()
+        if not self._ps_ok:
+            return False
+        self._visemas_estimadas(texto)  # nativo não tem eventos: pulsa por duração
+        ok_ps, err_ps = _tts_powershell(
+            texto,
+            float(self.config.get("voz_velocidade", 0.85)),
+            float(self.config.get("voz_volume", 1.0)))
+        if getattr(self, "_fim_visemas", None):
+            self._fim_visemas.set()
+        if ok_ps:
+            self._motor, self._ps_ok = "nativo", True
+            return True
+        self._ps_ok = False
+        self._erro = err_ps[:120]
+        return False
+
+    def _falar_pyttsx3(self, texto: str) -> bool:
+        """pyttsx3 com engine NOVO a cada fala (workaround da v4.10.4)."""
+        if not TEM_PYTTSX3:
+            self._status = "sem_biblioteca"
+            return False
+        engine = None
+        try:
+            engine = pyttsx3.init()
+            self._configurar(engine)
+            self._ligar_visemas(engine)
+            engine.say(texto)
+            engine.runAndWait()
+            self._motor, self._status, self._erro = "pyttsx3", "ok", ""
+            return True
+        except Exception as e:
+            self._status, self._erro = "erro_engine", str(e)
+            return False
+        finally:
+            if engine is not None:
+                try:
+                    engine.stop()
+                except Exception:
+                    pass
+                del engine
+
     def _loop(self) -> None:
         while True:
             texto = self._fila.get()
-            if texto == "__reconfigurar__":
-                self._sondar_vozes()  # só pra atualizar status/vozes; nada fica retido
+            if texto in ("__reconfigurar__", "__sondar__"):
+                self._sondar_vozes()  # atualiza status/vozes; nada fica retido
                 continue
-            # ---- motor 1: pyttsx3 (engine NOVO a cada fala — ver nota da v4.10.4) ----
-            falou = False
-            if TEM_PYTTSX3:
-                engine = None
-                try:
-                    engine = pyttsx3.init()
-                    self._configurar(engine)
-                    self._ligar_visemas(engine)
-                    engine.say(texto)
-                    engine.runAndWait()
-                    falou = True
-                    self._status, self._erro = "ok", ""
-                except Exception as e:
-                    self._status, self._erro = "erro_engine", str(e)
-                finally:
-                    if engine is not None:
-                        try:
-                            engine.stop()
-                        except Exception:
-                            pass
-                        del engine
-            else:
-                self._status = "sem_biblioteca"
-            # ---- motor 2: TTS NATIVO do Windows (fallback) ----
+            # v4.10.6: no Windows o pyttsx3 continuou mudo após a 1a fala mesmo com
+            # engine novo por fala (v4.10.4) — a voz nativa assume o posto de
+            # principal lá; pyttsx3 segue principal no Linux/Mac e reserva no Windows.
+            falou = self._falar_nativo(texto) if self._nativo_preferido() else False
             if not falou:
-                self._visemas_estimadas(texto)  # nativo não tem eventos: pulsa por duração
-                ok_ps, err_ps = _tts_powershell(
-                    texto,
-                    float(self.config.get("voz_velocidade", 0.85)),
-                    float(self.config.get("voz_volume", 1.0)))
-                if getattr(self, "_fim_visemas", None):
-                    self._fim_visemas.set()
-                if ok_ps:
-                    self._ps_ok = True
-                    if self._status != "ok":
-                        self._status = self._status or "sem_biblioteca"
-                else:
-                    self._ps_ok = False
-                    self._status = "sem_voz"
-                    self._erro = (f"pyttsx3: {self._erro[:80]} | "
-                                  f"nativo: {err_ps[:80]}")
+                falou = self._falar_pyttsx3(texto)
+            if not falou and not self._nativo_preferido():
+                falou = self._falar_nativo(texto)  # última chance (Windows)
 
     def _ligar_visemas(self, engine) -> None:
         """pyttsx3 dispara 'word' a cada palavra — vira pulso na boca.

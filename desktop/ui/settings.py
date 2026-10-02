@@ -93,6 +93,15 @@ class PainelConfig(tk.Toplevel):
                       activeforeground="#ff5a4d", selectcolor="#1d1214",
                       font=("Segoe UI", 10), bd=0, anchor="w"
                       ).pack(fill=tk.X, padx=10, pady=(10, 2))
+        # v4.10.6: no Windows, voz nativa (System.Speech) é mais confiável que o
+        # pyttsx3 — é o motor principal por padrão lá; desmarque p/ testar pyttsx3
+        import sys as _sys
+        self.var_natwin = tk.BooleanVar(value=bool(cfg.get("voz_natwin", True)))
+        tk.Checkbutton(zona, text="Usar voz NATIVA do Windows (recomendado — mais confiável)",
+                       variable=self.var_natwin,
+                       bg="#171012", fg="#9c8a86", activebackground="#171012",
+                       selectcolor="#1d1214", font=("Segoe UI", 9), bd=0, anchor="w"
+                       ).pack(fill=tk.X, padx=10, pady=(0, 2)) if _sys.platform.startswith("win") else None
         linha2 = tk.Frame(zona, bg="#171012")
         linha2.pack(fill=tk.X, padx=10, pady=(2, 6))
         tk.Label(linha2, text="Velocidade da fala", fg="#9c8a86",
@@ -276,6 +285,8 @@ class PainelConfig(tk.Toplevel):
         cfg = config.load()
         cfg["gemini_api_key"] = chave
         cfg["voz_ativa"] = self.var_voz.get()
+        if hasattr(self, "var_natwin"):
+            cfg["voz_natwin"] = bool(self.var_natwin.get())
         cfg["voz_velocidade"] = float(self.vel.get())
         cfg["cerebro"] = self.var_cerebro.get()
         cfg["ollama_model"] = self.cmb_modelo.get()
@@ -505,6 +516,8 @@ class PainelConfig(tk.Toplevel):
         cfg = config.load()
         cfg["gemini_api_key"] = self.var_chave.get().strip()
         cfg["voz_ativa"] = self.var_voz.get()
+        if hasattr(self, "var_natwin"):
+            cfg["voz_natwin"] = bool(self.var_natwin.get())
         cfg["voz_velocidade"] = float(self.vel.get())
         cfg["cerebro"] = self.var_cerebro.get()
         cfg["ollama_model"] = self.cmb_modelo.get()

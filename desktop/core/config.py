@@ -15,6 +15,7 @@ DEFAULTS = {
     "ollama_model": "",        # ex: "llama3.2" — escolhido em ⚙ CONFIG
     "tema": "novoskin",        # "novoskin" (padrão) | "busto" | "radar" | "classico" | "vermelho" | "gold"
     "voz_id": "",              # v5.1.8: voz escolhida em ⚙ CONFIG ("" = automática)
+    "voz_natwin": True,        # v4.10.6: Windows prefere TTS nativo (mais confiável)
 }
 
 
