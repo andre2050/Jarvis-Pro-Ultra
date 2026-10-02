@@ -100,7 +100,7 @@ class ArcReactorHud(tk.Canvas):
         elif _tema.atual() == "busto":
             self._frame_busto(cx, cy, r, el)
         elif _tema.atual() == "novoskin":
-            self._frame_busto(cx, cy, r, el, painel_lateral=True)
+            self._frame_novoskin(cx, cy, r, el)
         else:
             self._frame_arc(cx, cy, r, el)
 
@@ -360,6 +360,150 @@ class ArcReactorHud(tk.Canvas):
             self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
                              outline=principal, width=2, stipple="gray50")
 
+
+    def _frame_novoskin(self, cx, cy, r, el):
+        """NOVOSKIN (02/10/2026, foto de referência do André): o MESMO busto
+        wireframe, mas com acabamento mais fiel à foto — olhos em fenda fina
+        (não bloco sólido), boca em grade visor, reator com núcleo em camadas
+        + faíscas, e o painel HUD de círculos na lateral direita."""
+        gelo = _T("vivo")
+        gelo_dim = _T("dim")
+        azul = _T("principal")
+        glows = _tema.cores()["glows"]
+
+        if self.speaking or self.listening:
+            raio = r * (0.94 + 0.02 * math.sin(el * 6))
+            self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
+                             outline=azul, width=2, stipple="gray50")
+
+        # ---- crânio + têmporas (igual ao busto clássico) ----
+        top = cy - r * 0.92
+        self.create_arc(cx - r * 0.58, top, cx + r * 0.58, cy + r * 0.10,
+                         start=0, extent=180, style=tk.ARC, outline=gelo, width=2)
+        for lado in (-1, 1):
+            x_t = cx + lado * r * 0.58
+            self.create_line(x_t, cy - r * 0.42, x_t + lado * r * 0.02, cy + r * 0.18,
+                             fill=gelo_dim, width=1.4)
+            # aleta/antena lateral saindo da têmpora (como na foto)
+            self.create_line(x_t, cy - r * 0.42, x_t + lado * r * 0.16, cy - r * 0.58,
+                             fill=gelo_dim, width=1.2)
+
+        # ---- faceplate com cristas diagonais (facetado, não só vertical) ----
+        fx1, fx2 = cx - r * 0.42, cx + r * 0.42
+        fy1, fy2 = cy - r * 0.56, cy + r * 0.30
+        self.create_rectangle(fx1, fy1, fx2, fy2, outline=gelo, width=2)
+        for i in range(1, 4):
+            x = fx1 + (fx2 - fx1) * i / 4
+            self.create_line(x, fy1 + r * 0.06, x, fy2 - r * 0.06,
+                            fill=gelo_dim, width=1, stipple="gray50")
+        for sinal in (-1, 1):  # cristas diagonais saindo do centro da testa
+            self.create_line(cx, fy1 + r * 0.05,
+                             cx + sinal * r * 0.30, fy1 + r * 0.22,
+                             fill=gelo_dim, width=1, stipple="gray50")
+
+        # ---- olhos: fenda fina luminosa com halo (não bloco sólido) ----
+        for lado in (-1, 1):
+            ox = cx + lado * r * 0.20
+            x1, y1 = ox - lado * r * 0.12, cy - r * 0.23
+            x2, y2 = ox + lado * r * 0.12, cy - r * 0.15
+            self.create_line(x1, y1, x2, y2, fill=glows[4], width=5, capstyle=tk.ROUND)
+            self.create_line(x1, y1, x2, y2, fill=gelo, width=2, capstyle=tk.ROUND)
+
+        # ---- boca: grade visor fina (3 ripas) que se abre com o visema ----
+        boca = 2 + self._visema * r * 0.09
+        if self.speaking and self._visema < 0.15:
+            boca = 2 + r * 0.012 * (1 + math.sin(el * 18))
+        bx1, bx2 = cx - r * 0.15, cx + r * 0.15
+        by = cy + r * 0.10
+        for i in range(3):
+            yy = by - boca + i * boca
+            self.create_line(bx1, yy, bx2, yy, fill=glows[3], width=2)
+
+        if self.thinking:
+            ys = fy1 + (fy2 - fy1) * ((el * 0.55) % 1.0)
+            self.create_line(fx1 - 6, ys, fx2 + 6, ys, fill=azul, width=2, stipple="gray50")
+        if self.listening:
+            self.create_oval(cx - r * 0.70, cy - r * 0.70, cx + r * 0.70, cy + r * 0.70,
+                             outline=azul, width=1.5, stipple="gray25")
+
+        # ---- ombros/tórax com fiação (igual ao busto) ----
+        sh_y = cy + r * 0.52
+        self.create_line(cx - r * 0.95, sh_y + r * 0.38, cx - r * 0.55, sh_y,
+                         fill=gelo_dim, width=2)
+        self.create_line(cx + r * 0.95, sh_y + r * 0.38, cx + r * 0.55, sh_y,
+                         fill=gelo_dim, width=2)
+        self.create_line(cx - r * 0.55, sh_y, cx - r * 0.30, sh_y - r * 0.10,
+                         fill=gelo_dim, width=1.4)
+        self.create_line(cx + r * 0.55, sh_y, cx + r * 0.30, sh_y - r * 0.10,
+                         fill=gelo_dim, width=1.4)
+        for i in range(3):
+            y = sh_y + r * 0.08 + i * r * 0.09
+            self.create_line(cx - r * 0.40 + i * r * 0.04, y,
+                             cx - r * 0.12 - i * r * 0.03, y + r * 0.02,
+                             fill=gelo_dim, width=1, stipple="gray50")
+            self.create_line(cx + r * 0.40 - i * r * 0.04, y,
+                             cx + r * 0.12 + i * r * 0.03, y + r * 0.02,
+                             fill=gelo_dim, width=1, stipple="gray50")
+
+        # ---- reator: núcleo em camadas + hexágono + faíscas (mais denso que o busto) ----
+        rcx, rcy = cx, cy + r * 0.60
+        rr = r * 0.14
+        brilho = 0.55 + 0.25 * math.sin(el * 2.4) + (0.12 if self.speaking else 0)
+        self.create_oval(rcx - rr * 2.2, rcy - rr * 2.2, rcx + rr * 2.2, rcy + rr * 2.2,
+                         fill=glows[1], outline="")
+        self.create_oval(rcx - rr * 1.5, rcy - rr * 1.5, rcx + rr * 1.5, rcy + rr * 1.5,
+                         outline=gelo_dim, width=1)
+        self.create_oval(rcx - rr * 1.15, rcy - rr * 1.15, rcx + rr * 1.15, rcy + rr * 1.15,
+                         outline=azul, width=2)
+        hexa = []  # hexágono interno (núcleo facetado como na foto)
+        for i in range(6):
+            a = math.radians(60 * i + 90 + el * 8)
+            hexa.append((rcx + rr * 0.85 * math.cos(a), rcy + rr * 0.85 * math.sin(a)))
+        self.create_polygon(*hexa, outline=gelo, fill=glows[4], width=1.3)
+        self.create_oval(rcx - rr * 0.32, rcy - rr * 0.32, rcx + rr * 0.32, rcy + rr * 0.32,
+                         fill=_cor_letra(min(1.0, brilho)), outline="")
+        for a in (0, 90, 180, 270):
+            rad = math.radians(a)
+            self.create_line(rcx + rr * 0.85 * math.cos(rad), rcy + rr * 0.85 * math.sin(rad),
+                             rcx + rr * 1.5 * math.cos(rad), rcy + rr * 1.5 * math.sin(rad),
+                             fill=gelo, width=1.6)
+        for i in range(5):  # faíscas ao redor do núcleo
+            a = el * 1.3 + i * (360 / 5) * math.pi / 180
+            pr = rr * (1.7 + 0.15 * math.sin(el * 3 + i))
+            px, py = rcx + pr * math.cos(a), rcy + pr * math.sin(a)
+            self.create_oval(px - 1.3, py - 1.3, px + 1.3, py + 1.3, fill=glows[3], outline="")
+        if self.speaking:
+            pulse = (el % 1.2) / 1.2
+            ra = rr * (1.5 + pulse * 1.3)
+            self.create_oval(rcx - ra, rcy - ra, rcx + ra, rcy + ra,
+                             outline=azul, width=2, stipple="gray50")
+
+        for i in range(7):
+            pr = r * (0.5 + 0.45 * ((i * 0.137 + el * 0.05) % 1.0))
+            pa = el * 0.4 + i * 2.3
+            px, py = cx + pr * math.cos(pa), cy + pr * math.sin(pa) * 0.9
+            self.create_oval(px - 1.5, py - 1.5, px + 1.5, py + 1.5,
+                             fill=gelo_dim, outline="")
+
+        txt = time.strftime("%H:%M")
+        if self._bat is not None:
+            txt += f"  ·  {self._bat}%"
+        else:
+            txt += f"  ·  CPU {self._cpu:.0f}%"
+        self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
+                         fill=gelo_dim)
+
+        # ---- painel HUD lateral: coluna de círculos à direita (foto do André) ----
+        px = self.size * 0.94
+        py0 = cy - r * 0.55
+        for i in range(4):
+            py = py0 + i * r * 0.26
+            aceso = (int(el * 1.3) + i) % 4 == 0
+            self.create_oval(px - 7, py - 7, px + 7, py + 7,
+                             outline=azul, width=1.5,
+                             fill=(glows[3] if aceso else ""))
+        self.create_line(px, py0 - r * 0.12, px, py0 + 3 * r * 0.26 + r * 0.12,
+                         fill=gelo_dim, width=1)
 
     def _frame_busto(self, cx, cy, r, el, painel_lateral=False):
         """BUSTO HOLOGRÁFICO (paridade Android v4.9.3→4.10.3): capacete
