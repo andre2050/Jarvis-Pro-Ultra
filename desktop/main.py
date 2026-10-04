@@ -14,7 +14,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-from core import brain, config, tools, confirm
+from core import brain, config, intents, tools, confirm
 from core.action_loader import discover_actions
 from core.adapters import PlayerAdapter, SessionMemoryAdapter
 from core.config import sync_api_keys
@@ -81,6 +81,7 @@ class JarvisApp(tk.Tk):
 
         self.protocol("WM_DELETE_WINDOW", self._sair)
         self.bind("<F4>", lambda e: self._alternar_voz())
+        self.bind("<F11>", lambda e: self._abrir_mesa())
         self.after(80, self._consumir_eventos)
 
     # ==================== LAYOUT ====================
@@ -309,6 +310,18 @@ class JarvisApp(tk.Tk):
             msg = "Analise esta foto, senhor."
         if not msg or self._ocupado:
             return
+        # v4.11.0: comandos críticos respondem NA HORA (hora, data, status,
+        # abrir app, música, volume, timer) — offline, sem cérebro, sem chave.
+        if not self._foto_b64:
+            rapido = intents.reconhecer(msg)
+            if rapido is not None:
+                resposta, _ = rapido
+                self.entrada.delete(0, tk.END)
+                self.chat.add("user", msg)
+                self.chat.add("jarvis", resposta)
+                self.voz.falar(resposta)
+                self._status("pronto")
+                return
         if self.cfg.get("cerebro") == "ollama":
             if not self.cfg.get("ollama_model"):
                 self._abrir_config()
@@ -329,6 +342,15 @@ class JarvisApp(tk.Tk):
             self.fila_eventos.put(resultado)
 
         brain.process_async(self.cfg, self.historico, msg, retorno, image_b64=foto)
+
+    def _abrir_mesa(self):
+        """v4.11.0: Modo Mesa — tela cheia sempre ligada com relógio,
+        data, clima ao vivo e o holograma (F11 ou ⚙ CONFIG)."""
+        try:
+            from ui.mesa import ModoMesa
+            ModoMesa(self)
+        except Exception as e:
+            self.chat.add("erro", f"Modo Mesa falhou: {e}")
 
     def _anexar_foto(self):
         """Escolhe uma foto do PC, redimensiona pra caber no Gemini e anexa

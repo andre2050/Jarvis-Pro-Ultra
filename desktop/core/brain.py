@@ -6,7 +6,7 @@ devolvemos -> resposta final. Mesma arquitetura do Android v4.3.0.
 import json
 import threading
 
-from . import gemini_client, memory, ollama_client, perception, tools
+from . import gemini_client, memory, ollama_client, perception, precisao, tools
 from .adapters import normaliza_schema
 from version import __version__
 
@@ -34,13 +34,49 @@ def todas_declaracoes() -> list:
     return decls
 
 
-def _executa_tool(name: str, args: dict) -> str:
-    """Despacha: primeiro as tools nativas, depois o registro de ações."""
+def _executa_raw(name: str, args: dict) -> str:
+    """Despacha de verdade: primeiro as tools nativas, depois o registro."""
     if name in tools.nomes():
         return tools.execute(name, args)
     if _registro is not None and _registro.has(name):
         return _registro.run(name, args, _ctx or {})
     return f"tool desconhecida: {name}"
+
+
+def _executa_tool(name: str, args: dict) -> str:
+    """v4.11.0 — checagem em 2 passos:
+    1) valida a chamada contra o schema ANTES de executar (o modelo se
+       corrige na rodada seguinte em vez de agir errado);
+    2) ações irreversíveis/externas passam pelo termômetro de risco —
+       só rodam com o humano clicando CONFIRMAR na tela."""
+    erro = precisao.valida_chamada(name, args, todas_declaracoes())
+    if erro:
+        return f"[ARGUMENTOS INVÁLIDOS — corrija os argumentos e chame de novo] {erro}"
+    risco = precisao.avalia_risco(name, args)
+    if risco:
+        from . import confirm
+        titulo, detalhe = risco
+        return confirm.request(name, titulo, detalhe,
+                               lambda: _executa_raw(name, args))
+    resultado = _executa_raw(name, args)
+    _registrar_acao(name, args)
+    return resultado
+
+
+# v4.11.0: ações executadas nesta sessão — entram no prompt do próximo
+# turno (o modelo sabe o que JÁ fez e não repete à toa)
+_acoes_sessao: list = []
+
+
+def _registrar_acao(name: str, args: dict) -> None:
+    try:
+        extra = next((str(v) for v in (args or {}).values()
+                      if isinstance(v, (str, int, float)) and str(v).strip()), "")
+        resumo = f"{name}({extra[:40]})" if extra else name
+    except Exception:
+        resumo = name
+    _acoes_sessao.append(resumo)
+    del _acoes_sessao[:-15]
 
 
 def system_prompt() -> str:
@@ -58,6 +94,8 @@ Regras:
 - No fim deste prompt vem o CONTEXTO VIVO do computador (hora, CPU, RAM, bateria) — você já sabe isso sem precisar de tools; cite quando for útil (ex: 'CPU em 87%, senhor, sugiro fechar umas abas').
 - Quando o senhor pedir um resumo/briefing do dia, componha com o contexto vivo e listar_memorias — um resumo curto e espirituoso.
 - Se não tiver a tool certa, responda o melhor que puder e sugira o que pode fazer.
+- Se uma tool devolver [ARGUMENTOS INVÁLIDOS], corrija os argumentos conforme o erro e chame a MESMA tool de novo em vez de desistir.
+- Ações irreversíveis (apagar arquivos, enviar mensagens, controlar mouse/teclado) pedem confirmação na tela do senhor — avise que está esperando o clique e nunca diga que já fez antes do resultado chegar.
 - Versão atual do sistema: {__version__} (edição desktop em Python).
 - O módulo HERMES pode estar orquestrando por cima de você: quando ele executa um plano, apenas componha a resposta final com o que ele trouxer.
 """.strip()
@@ -86,6 +124,10 @@ def process(cfg: dict, history: list, user_message: str,
 
     mems = memory.buscar(user_message)
     prompt = system_prompt() + "\n" + perception.contexto_do_computador()
+    if _acoes_sessao:
+        prompt += ("\nAções que VOCÊ já executou nesta sessão (mais recente por "
+                   "último): " + "; ".join(_acoes_sessao[-10:]) +
+                   ". Não repita o que já foi feito a menos que o senhor peça.")
     if mems:
         prompt += "\nMemórias de longo prazo sobre o senhor (use quando relevante):\n- " + "\n- ".join(mems)
     if image_b64:

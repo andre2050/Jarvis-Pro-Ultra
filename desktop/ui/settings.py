@@ -244,6 +244,44 @@ class PainelConfig(tk.Toplevel):
                   fg="#ff5a4d", bd=0, font=("Consolas", 8, "bold"), cursor="hand2",
                   command=self._mostra_plano_hermes).pack(anchor="w", padx=10, pady=(0, 8))
 
+        # ---------- MODO MESA (v4.11.0) ----------
+        self._secao("🖥 MODO MESA / CARRO (v4.11.0)")
+        zona_m = tk.Frame(self, bg="#171012")
+        zona_m.pack(fill=tk.X, padx=24)
+        tk.Label(zona_m, text=(
+            "Tela cheia SEMPRE LIGADA com o holograma, relógio, data e clima\n"
+            "ao vivo. Sai com Esc ou clique. Atalho: F11."),
+            fg="#f2e6e4", bg="#171012", font=("Segoe UI", 9),
+            justify=tk.LEFT).pack(anchor="w", padx=10, pady=(6, 4))
+        tk.Button(zona_m, text="▶ Abrir Modo Mesa", bg="#0d0708",
+                  fg="#ff5a4d", bd=0, font=("Consolas", 9, "bold"), cursor="hand2",
+                  command=self._abrir_mesa).pack(anchor="w", padx=10, pady=(0, 8))
+
+        # ---------- CATÁLOGO DE COMANDOS (v4.11.0) ----------
+        self._secao("📖 CATÁLOGO DE COMANDOS — tudo que o J.A.R.V.I.S sabe fazer")
+        zona_c = tk.Frame(self, bg="#171012")
+        zona_c.pack(fill=tk.BOTH, padx=24, expand=True)
+        try:
+            from core import brain
+            decls = brain.todas_declaracoes()
+        except Exception:
+            decls = []
+        linhas = []
+        for d in decls:
+            linhas.append(f"▸ {d.get('name', '?')} — {d.get('description', '')[:110]}")
+        txt_cat = tk.Text(zona_c, bg="#0d0708", fg="#f2e6e4", bd=0,
+                          highlightthickness=0, font=("Consolas", 8),
+                          wrap="word", height=min(14, max(6, len(decls) // 3)),
+                          state=tk.DISABLED)
+        txt_cat.pack(fill=tk.BOTH, expand=True, padx=10, pady=(6, 8))
+        txt_cat.configure(state=tk.NORMAL)
+        txt_cat.insert("1.0",
+            "Comandos rápidos (respondem na hora, até offline):\n"
+            "  'que horas são' · 'que dia é hoje' · 'status do pc' · 'abre o bloco de notas'\n"
+            "  'toca música de rock' · 'aumenta o volume' · 'me avisa em 10 minutos pra sair'\n\n"
+            "Tools do cérebro (nuvem ou offline):\n" + "\n".join(linhas))
+        txt_cat.configure(state=tk.DISABLED)
+
         # ---------- SOBRE ----------
         self._secao("ℹ SOBRE")
         zona4 = tk.Frame(self, bg="#171012")
@@ -270,6 +308,15 @@ class PainelConfig(tk.Toplevel):
     def _mostra_plano_hermes(self):
         from core import hermes
         self.lbl_hermes.config(text=hermes.ultimo_relatorio())
+
+    def _abrir_mesa(self):
+        """v4.11.0: abre o Modo Mesa (mesma janela do F11 do app)."""
+        try:
+            from ui.mesa import ModoMesa
+            ModoMesa(self)
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Modo Mesa", f"Não consegui abrir: {e}", parent=self)
 
     def _secao(self, txt: str):
         tk.Label(self, text=txt, bg="#0d0708", fg="#ff5a4d",

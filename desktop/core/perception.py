@@ -32,7 +32,9 @@ def contexto_do_computador() -> str:
         agora = datetime.now()
         hora = agora.strftime("%H:%M")
         dia = agora.strftime("%d/%m/%Y")
-        partes = [f"Contexto do computador AGORA: são {hora} de {dia}"]
+        semana = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+                  "sexta-feira", "sábado", "domingo"][agora.weekday()]
+        partes = [f"Contexto do computador AGORA: é {semana}, {hora} de {dia}"]
 
         if TEM_PSUTIL:
             cpu = psutil.cpu_percent(interval=0.3)
