@@ -12,10 +12,19 @@ from urllib.parse import quote_plus
 
 import requests
 
-from . import memory
+from . import agenda, gemini_client, memory
 
 # ---------- callback opcional (o app registra para avisar quando o timer dispara) ----------
 on_timer_fire = None
+
+
+# v4.12.0: ver_tela precisa da chave do Gemini — main.py liga no boot
+_cfg: dict = {}
+
+
+def set_cfg(cfg: dict) -> None:
+    global _cfg
+    _cfg = cfg
 
 
 def avisa_timer(motivo: str):
@@ -58,6 +67,13 @@ def declarations() -> list:
         _decl("definir_timer", "Define um timer/lembrete que avisa com mensagem e voz quando o tempo acaba.",
               {"type": "object", "properties": {"segundos": {"type": "number", "description": "Duração em segundos"}, "motivo": {"type": "string", "description": "Motivo do timer (opcional)"}}, "required": ["segundos"]}),
         _decl("desfazer_ultima_acao", "Desfaz a ação reversível mais recente (arquivos movidos/renomeados/criados/editados, configurações alteradas)."),
+        _decl("agendar_aviso", "Agenda um aviso persistente: dispara com voz e mensagem na hora marcada, MESMO se o app só abrir depois (salvo em disco). Formatos: '18:30' (hoje, ou amanhã se já passou), 'amanhã 08:00', '05/12 09:00', '05/12/2026 09:00' ou '2026-12-05T09:00'.",
+              {"type": "object", "properties": {"horario": {"type": "string", "description": "Quando avisar, ex: '18:30' ou 'amanhã 08:00'"}, "motivo": {"type": "string", "description": "O que avisar na hora marcada"}}, "required": ["horario", "motivo"]}),
+        _decl("listar_agenda", "Lista os avisos agendados com seus ids."),
+        _decl("cancelar_aviso", "Cancela um aviso agendado pelo id (veja em listar_agenda).",
+              {"type": "object", "properties": {"id": {"type": "number", "description": "Id do aviso em listar_agenda"}}, "required": ["id"]}),
+        _decl("ver_tela", "Lê a tela do computador: tira um print e descreve/transcreve o que está nela (erro, texto, janela). Requer o cérebro na nuvem com chave válida.",
+              {"type": "object", "properties": {"pergunta": {"type": "string", "description": "O que observar ou responder sobre a tela (opcional)"}}}),
     ]
 
 
@@ -68,7 +84,8 @@ def nomes() -> set:
     return {"hora_agora", "status_do_sistema", "clima", "onde_estou", "navegar_para",
             "tocar_musica", "controlar_volume", "pesquisar_web", "abrir_site",
             "abrir_app", "lembrar_fato", "listar_memorias", "definir_timer",
-            "desfazer_ultima_acao"}
+            "desfazer_ultima_acao", "agendar_aviso", "listar_agenda",
+            "cancelar_aviso", "ver_tela"}
 
 
 def execute(name: str, args: dict) -> str:
@@ -87,6 +104,10 @@ def execute(name: str, args: dict) -> str:
         "listar_memorias": lambda: memory.listar(),
         "definir_timer": lambda: _timer(args.get("segundos", 60), args.get("motivo", "")),
         "desfazer_ultima_acao": _desfazer,
+        "agendar_aviso": lambda: agenda.agendar(args.get("horario", ""), args.get("motivo", "")),
+        "listar_agenda": lambda: agenda.listar(),
+        "cancelar_aviso": lambda: agenda.cancelar(args.get("id", 0)),
+        "ver_tela": lambda: _ver_tela(args.get("pergunta", "")),
     }.get(name)
     if fn is None:
         return f"tool desconhecida: {name}"
@@ -349,3 +370,43 @@ def _timer(segundos, motivo: str) -> str:
     else:
         tempo = f"{segundos} s"
     return f"timer de {tempo} definido{', para ' + motivo if motivo else ''}, senhor. Eu aviso."
+
+
+# ==================== VISÃO DE TELA (v4.12.0) ====================
+
+def _ver_tela(pergunta: str) -> str:
+    """Tira um print da tela e pede pro Gemini descrever/ler. Sem chave ou
+    no modo offline, avisa na cara — nunca falha em silêncio."""
+    if not _cfg.get("gemini_api_key"):
+        return ("A visão de tela funciona no cérebro ☁ NUVEM, senhor — configure "
+                "a chave do Gemini no ⚙ CONFIG e tente de novo.")
+    try:
+        import base64
+        import io
+        from PIL import Image
+        img = None
+        try:
+            from PIL import ImageGrab
+            try:
+                import mss
+                with mss.mss() as s:
+                    quadro = s.grab(s.monitors[0])
+                    img = Image.frombytes("RGB", (quadro.width, quadro.height),
+                                          quadro.bgra, "raw", "BGRX")
+            except Exception:
+                img = ImageGrab.grab()
+        except Exception:
+            return "não consegui acessar a captura de tela (Pillow), senhor."
+        if img is None:
+            return "não consegui capturar a tela, senhor."
+        img.thumbnail((1280, 1280))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        prompt = ("Você é o JARVIS. Isto é um print da tela do computador do André. "
+                  "Descreva objetivamente: janelas abertas, textos principais e "
+                  "qualquer erro visível. Responda em português do Brasil, curto "
+                  "e direto. " + (f"Pergunta dele: {pergunta}" if pergunta else "")).strip()
+        return gemini_client.vision(_cfg["gemini_api_key"], prompt, b64)
+    except Exception as e:
+        return f"não consegui enxergar a tela, senhor: {e}"

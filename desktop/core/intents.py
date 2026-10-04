@@ -64,6 +64,23 @@ def _reconhecer(texto: str, executa) -> tuple | None:
     if re.fullmatch(r"(silencia|silenciar|mute|mudo|muta|no mudo|sem som)\??", tl):
         return executa("controlar_volume", {"acao": "silenciar"}), "volume"
 
+    # aviso com HORA MARCADA: "às 18:30 me avisa do boleto" (agenda persistente)
+    m = re.search(r"(?:às|as)\s*(\d{1,2})(?:h|:|h)(\d{2})?\b", tl)
+    if m and re.search(r"\b(avisa|avise|lembra|lembrete|agend\w+)\b", tl):
+        hora = int(m.group(1)) % 24
+        minuto = int(m.group(2) or 0) % 60
+        horario = f"{hora:02d}:{minuto:02d}"
+        if "amanh" in tl:
+            horario = "amanhã " + horario
+        motivo = re.sub(r"[àa]s\s*\d{1,2}(?:h|:)?\d{0,2}", " ", t, flags=re.I)
+        motivo = re.sub(r"\b(me\s+)?(avisa[rl]?|avise|lembra[rl]?|lembrete|"
+                        r"agend\w+|que|às|as|no|na)\b", " ",
+                        motivo, flags=re.I)
+        motivo = re.sub(r"\s+", " ", motivo).strip(" .,!?;:")
+        motivo = re.sub(r"^(de|do|da|pra|para)\s+", "", motivo, flags=re.I).strip(" .,!?;:")
+        return executa("agendar_aviso",
+                       {"horario": horario, "motivo": (motivo or "aviso")[:60]}), "agenda"
+
     # timer/lembrete: "me avisa em 10 minutos (pra X)" / "timer de 30 segundos"
     m = re.search(r"(?:avisa|avise|lembra|lembrete|timer)"
                   r"[^.?!]{0,24}?(?:em|de)\s+(\d{1,3})\s*"

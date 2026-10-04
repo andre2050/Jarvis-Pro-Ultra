@@ -14,7 +14,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-from core import brain, config, intents, tools, confirm
+from core import agenda, brain, config, intents, tools, confirm
 from core.action_loader import discover_actions
 from core.adapters import PlayerAdapter, SessionMemoryAdapter
 from core.config import sync_api_keys
@@ -51,6 +51,11 @@ class JarvisApp(tk.Tk):
 
         # o timer das tools avisa por aqui
         tools.on_timer_fire = self._timer_disparou
+        tools.set_cfg(self.cfg)   # v4.12.0: ver_tela usa a chave do Gemini
+
+        # v4.12.0: viga dos avisos agendados (agenda.json em disco) — os
+        # atrasados de quando o app estava fechado disparam no boot
+        threading.Thread(target=self._vigia_agenda, daemon=True).start()
 
         # ---------- FUSÃO MARK LIII: registro de ações auto-descritivas ----------
         self.registro = discover_actions(
@@ -455,6 +460,19 @@ class JarvisApp(tk.Tk):
                     _, frase = item
                     self.chat.add("sistema", f"« {frase} »")
                     self.voz.falar(frase)
+                elif isinstance(item, tuple) and item[0] == "agenda":
+                    motivo, quando = item[1]
+                    atrasado = ""
+                    try:
+                        from datetime import datetime as _dt
+                        d = _dt.fromisoformat(quando)
+                        atrasado = (" (atrasado — o app estava fechado na hora)"
+                                    if (_dt.now() - d).total_seconds() > 120 else "")
+                    except Exception:
+                        pass
+                    msg = f"⏰ Aviso agendado, senhor: {motivo}.{atrasado}"
+                    self.chat.add("jarvis", msg)
+                    self.voz.falar(msg)
                 elif isinstance(item, tuple) and item[0] == "confirm":
                     titulo, detalhe = item[1]
                     aceito = messagebox.askyesno(
@@ -487,6 +505,17 @@ class JarvisApp(tk.Tk):
             self.voz.falar(resposta)
         self._ocupado = False
         self._status("pronto")
+
+    def _vigia_agenda(self):
+        """v4.12.0: confere os avisos agendados a cada 20s (thread daemon)."""
+        import time as _t
+        while True:
+            try:
+                for motivo, quando in agenda.devidos():
+                    self.fila_eventos.put(("agenda", (motivo, quando)))
+            except Exception:
+                pass
+            _t.sleep(20)
 
     def _timer_disparou(self, motivo: str):
         # chamado pela thread do timer -> atravessa a fila pra chegar na UI com segurança

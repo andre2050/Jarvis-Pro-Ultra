@@ -83,21 +83,42 @@ def limpar() -> str:
     return f"{n} memória(s) apagada(s)."
 
 
+def _normalizar(t: str) -> str:
+    """minúsculas e SEM ACENTO (evido/evito, vacina/vacinação)."""
+    import unicodedata
+    return unicodedata.normalize("NFD", (t or "").lower()).encode(
+        "ascii", "ignore").decode()
+
+
+_STOPWORDS = {"que", "para", "pra", "com", "sem", "senhor", "sobre", "isso",
+              "uma", "um", "como", "quando", "onde", "meu", "minha", "seu",
+              "sua", "ele", "ela", "não", "nao", "sim", "tem", "vou"}
+
+
 def buscar(query: str, limite: int = 5) -> list[str]:
-    """Busca memórias relevantes por palavras-chave (sem acento/caixa alta)."""
+    """v4.12.0: busca por RELEVÂNCIA (o RAG leve do pacote) — cada memória
+    ganha pontos por palavra casada (sem acento/caixa), bônus se a frase
+    inteira aparece, e empata pela mais recente. Retorna as N melhores,
+    em vez das N primeiras que casam qualquer palavra."""
     data = _load()
-    palavras = [p for p in re.split(r"\W+", query.lower()) if len(p) >= 4]
+    q = _normalizar(query)
+    palavras = [p for p in re.split(r"\W+", q)
+                if len(p) >= 3 and p not in _STOPWORDS]
     if not palavras:
         return []
-    resultados = []
-    for m in reversed(data.get("memorias", [])):
-        texto = m["texto"].lower()
-        pontos = sum(1 for p in palavras if p in texto)
-        if pontos:
-            resultados.append(f"{m['texto']} (guardada em {m['data']})")
-        if len(resultados) >= limite:
-            break
-    return resultados
+    frase = " ".join(palavras)
+    pontuadas = []
+    for m in data.get("memorias", []):
+        texto = _normalizar(m["texto"])
+        pontos = sum(2 for p in palavras if p in texto)
+        if pontos == 0:
+            continue
+        if frase and frase in texto:
+            pontos += 3  # a pergunta inteira aparece na memória: forte
+        pontuadas.append((pontos, m["data"], f"{m['texto']} (guardada em {m['data']})"))
+    # mais pontos primeiro; empate: mais recente
+    pontuadas.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return [t for _, _, t in pontuadas[:limite]]
 
 
 def log_interaction(tipo: str, texto: str) -> None:

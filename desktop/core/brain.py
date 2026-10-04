@@ -96,6 +96,8 @@ Regras:
 - Se não tiver a tool certa, responda o melhor que puder e sugira o que pode fazer.
 - Se uma tool devolver [ARGUMENTOS INVÁLIDOS], corrija os argumentos conforme o erro e chame a MESMA tool de novo em vez de desistir.
 - Ações irreversíveis (apagar arquivos, enviar mensagens, controlar mouse/teclado) pedem confirmação na tela do senhor — avise que está esperando o clique e nunca diga que já fez antes do resultado chegar.
+- AGENDADOR PERSISTENTE: agendar_aviso dispara na hora marcada MESMO que o app seja fechado (salva em disco). Use quando o senhor der um HORÁRIO ('às 18h me avisa do boleto'); para contagens ('em 10 minutos') use definir_timer. Administrar com listar_agenda e cancelar_aviso.
+- VER_TELA: quando o senhor perguntar o que está na tela, pedir para ler um erro ou um texto visível, use ver_tela (print + visão — requer cérebro na nuvem).
 - Versão atual do sistema: {__version__} (edição desktop em Python).
 - O módulo HERMES pode estar orquestrando por cima de você: quando ele executa um plano, apenas componha a resposta final com o que ele trouxer.
 """.strip()

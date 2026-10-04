@@ -107,3 +107,30 @@ def _call_model(model: str, api_key: str, system_prompt: str, contents: list, to
         elif part.get("text"):
             text = (text or "") + part["text"]
     return GeminiResult(text, fc_parts, model)
+
+
+def vision(api_key: str, prompt: str, b64: str, mime: str = "image/jpeg") -> str:
+    """v4.12.0: uma rodada de VISÃO pura (sem tools, sem histórico) — usada
+    pela tool ver_tela pra descrever o print da tela do senhor."""
+    for model in MODELS:
+        body = {
+            "contents": [{"parts": [
+                {"inline_data": {"mime_type": mime, "data": b64}},
+                {"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1024},
+        }
+        resp = requests.post(BASE_URL.format(model=model, key=api_key), json=body,
+                             timeout=(20, 60),
+                             headers={"Content-Type": "application/json"})
+        if resp.status_code == 404:
+            continue  # modelo aposentado: tenta o próximo da lista
+        if resp.status_code != 200:
+            raise GeminiHttpError(resp.status_code,
+                                  f"HTTP {resp.status_code}: {resp.text[:220]}")
+        data = resp.json()
+        try:
+            return (data["candidates"][0]["content"]["parts"][0].get("text")
+                    or "").strip()
+        except (KeyError, IndexError, TypeError):
+            raise GeminiHttpError(500, f"Resposta inesperada do Gemini: {json.dumps(data)[:220]}")
+    raise GeminiHttpError(404, "nenhum modelo de visão disponível")
