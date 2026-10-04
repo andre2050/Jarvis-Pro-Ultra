@@ -154,6 +154,9 @@ class PainelConfig(tk.Toplevel):
         self.lista_mem.pack(fill=tk.X, padx=10, pady=(8, 4), side=tk.TOP)
         barra_m = tk.Frame(zona_m, bg="#171012")
         barra_m.pack(fill=tk.X, padx=10, pady=(0, 10))
+        tk.Button(barra_m, text="Editar selecionada", command=self._editar_memoria,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
         tk.Button(barra_m, text="Apagar selecionada", command=self._apagar_memoria,
                   bg="#33100c", fg="#ffe4de", bd=0, font=("Segoe UI", 9),
                   cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
@@ -257,6 +260,96 @@ class PainelConfig(tk.Toplevel):
                   fg="#ff5a4d", bd=0, font=("Consolas", 9, "bold"), cursor="hand2",
                   command=self._abrir_mesa).pack(anchor="w", padx=10, pady=(0, 8))
 
+        # ---------- PERSONALIZAÇÃO (v4.14.0) ----------
+        self._secao("👤 PERSONALIZAÇÃO — como o JARVIS fala com o senhor")
+        zona_p = tk.Frame(self, bg="#171012")
+        zona_p.pack(fill=tk.X, padx=24)
+        cfg_atual = config.load()
+        self.var_nome_usuario = tk.StringVar(value=cfg_atual.get("nome_usuario", "André"))
+        self.var_nome_assistente = tk.StringVar(value=cfg_atual.get("nome_assistente", "J.A.R.V.I.S"))
+        self.var_estilo = tk.StringVar(value=cfg_atual.get("estilo", "formal"))
+        self.var_economica = tk.BooleanVar(value=bool(cfg_atual.get("modo_economico", False)))
+        self.var_whisper = tk.StringVar(value=cfg_atual.get("whisper_tamanho", "base"))
+        tk.Label(zona_p, text="Seu nome:", fg="#f2e6e4", bg="#171012",
+                 font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=10, pady=4)
+        tk.Entry(zona_p, textvariable=self.var_nome_usuario, bg="#0d0708",
+                 fg="#f2e6e4", bd=0, width=22, insertbackground="#ff5a4d").grid(
+            row=0, column=1, sticky="w", pady=4)
+        tk.Label(zona_p, text="Nome do assistente:", fg="#f2e6e4", bg="#171012",
+                 font=("Segoe UI", 9)).grid(row=0, column=2, sticky="w", padx=(16, 0), pady=4)
+        tk.Entry(zona_p, textvariable=self.var_nome_assistente, bg="#0d0708",
+                 fg="#f2e6e4", bd=0, width=18, insertbackground="#ff5a4d").grid(
+            row=0, column=3, sticky="w", pady=4)
+        tk.Label(zona_p, text="Estilo:", fg="#f2e6e4", bg="#171012",
+                 font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", padx=10, pady=4)
+        tk.Radiobutton(zona_p, text="Formal (senhor)", variable=self.var_estilo,
+                       value="formal", bg="#171012", fg="#f2e6e4",
+                       selectcolor="#0d0708", activebackground="#171012",
+                       font=("Segoe UI", 9)).grid(row=1, column=1, sticky="w")
+        tk.Radiobutton(zona_p, text="Descontraído (pelo seu nome)", variable=self.var_estilo,
+                       value="descontraido", bg="#171012", fg="#f2e6e4",
+                       selectcolor="#0d0708", activebackground="#171012",
+                       font=("Segoe UI", 9)).grid(row=1, column=2, columnspan=2, sticky="w")
+        tk.Label(zona_p, text="Ditado offline (Whisper):", fg="#f2e6e4", bg="#171012",
+                 font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", padx=10, pady=4)
+        cmb_w = ttk.Combobox(zona_p, textvariable=self.var_whisper, width=10,
+                             state="readonly", values=["tiny", "base", "small"])
+        cmb_w.grid(row=2, column=1, sticky="w", pady=4)
+        tk.Label(zona_p, text="menor = mais rápido · maior = entende melhor",
+                 fg="#9c8a86", bg="#171012", font=("Segoe UI", 8)).grid(
+            row=2, column=2, columnspan=2, sticky="w", padx=(16, 0))
+
+        # ---------- MODO ECONÔMICO (v4.14.0) ----------
+        self._secao("⚡ MODO ECONÔMICO — pra PC mais fraco")
+        zona_e = tk.Frame(self, bg="#171012")
+        zona_e.pack(fill=tk.X, padx=24)
+        tk.Label(zona_e, text=("Reduz o holograma pra ~12 fps e as leituras de CPU/RAM\n"
+                               "de 2s pra 8s. A voz e as respostas continuam iguais."),
+                  fg="#9c8a86", bg="#171012", font=("Segoe UI", 8),
+                  justify=tk.LEFT).pack(anchor="w", padx=10, pady=(6, 2))
+        tk.Checkbutton(zona_e, text="Ativar modo econômico (aplica na hora)",
+                       variable=self.var_economica, bg="#171012", fg="#f2e6e4",
+                       selectcolor="#0d0708", activebackground="#171012",
+                       font=("Segoe UI", 9),
+                       command=self._aplicar_economia).pack(anchor="w", padx=10, pady=(0, 8))
+
+        # ---------- BACKUP (v4.14.0) ----------
+        self._secao("💾 BACKUP — a vida do JARVIS em um arquivo")
+        zona_b = tk.Frame(self, bg="#171012")
+        zona_b.pack(fill=tk.X, padx=24)
+        tk.Label(zona_b, text=("Exporta memórias, agenda e configurações num .zip —\n"
+                               "troque de PC sem perder nada. Importar restaura tudo."),
+                  fg="#9c8a86", bg="#171012", font=("Segoe UI", 8),
+                  justify=tk.LEFT).pack(anchor="w", padx=10, pady=(6, 2))
+        barra_b = tk.Frame(zona_b, bg="#171012")
+        barra_b.pack(fill=tk.X, padx=10, pady=(0, 4))
+        tk.Button(barra_b, text="Exportar backup", command=self._exportar_backup,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
+        tk.Button(barra_b, text="Importar backup", command=self._importar_backup,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=6)
+        self.lbl_backup = tk.Label(barra_b, text="", fg="#9c8a86", bg="#171012",
+                                   font=("Segoe UI", 8), wraplength=360)
+        self.lbl_backup.pack(side=tk.LEFT, padx=8)
+
+        # ---------- DIAGNÓSTICO (v4.14.0) ----------
+        self._secao("🩺 DIAGNÓSTICO — teste de todas as ferramentas")
+        zona_d = tk.Frame(self, bg="#171012")
+        zona_d.pack(fill=tk.BOTH, padx=24)
+        barra_d = tk.Frame(zona_d, bg="#171012")
+        barra_d.pack(fill=tk.X, padx=10, pady=(6, 2))
+        tk.Button(barra_d, text="▶ Rodar diagnóstico", command=self._rodar_diagnostico,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
+        self.lbl_diag = tk.Label(barra_d, text="", fg="#9c8a86", bg="#171012",
+                                 font=("Segoe UI", 8))
+        self.lbl_diag.pack(side=tk.LEFT, padx=8)
+        self.txt_diag = tk.Text(zona_d, bg="#0d0708", fg="#f2e6e4", bd=0,
+                                highlightthickness=0, font=("Consolas", 8),
+                                height=8, wrap="word", state=tk.DISABLED)
+        self.txt_diag.pack(fill=tk.X, padx=10, pady=(2, 8))
+
         # ---------- CATÁLOGO DE COMANDOS (v4.11.0) ----------
         self._secao("📖 CATÁLOGO DE COMANDOS — tudo que o J.A.R.V.I.S sabe fazer")
         zona_c = tk.Frame(self, bg="#171012")
@@ -319,6 +412,71 @@ class PainelConfig(tk.Toplevel):
             from tkinter import messagebox
             messagebox.showerror("Modo Mesa", f"Não consegui abrir: {e}", parent=self)
 
+    def _aplicar_economia(self):
+        """v4.14.0: aplica o modo econômico NA HORA no holograma."""
+        try:
+            app = getattr(self, "app", None)
+            if app is not None and hasattr(app, "hud"):
+                app.hud.economia = bool(self.var_economia.get())
+        except Exception:
+            pass
+
+    def _exportar_backup(self):
+        from tkinter import filedialog
+        from core import backup
+        alvo = filedialog.asksaveasfilename(
+            parent=self, defaultextension=".zip",
+            initialfile="jarvis-backup.zip",
+            filetypes=[("Backup do JARVIS", "*.zip")])
+        if alvo:
+            self.lbl_backup.config(text=backup.exportar(alvo), fg="#ffd9a0")
+
+    def _importar_backup(self):
+        from tkinter import filedialog, messagebox
+        from core import backup
+        origem = filedialog.askopenfilename(
+            parent=self, filetypes=[("Backup do JARVIS", "*.zip")])
+        if not origem:
+            return
+        if not messagebox.askyesno(
+                "J.A.R.V.I.S",
+                "Importar substitui memórias, agenda e configurações atuais. Continuar?",
+                parent=self, icon="warning"):
+            return
+        msg = backup.importar(origem)
+        self.lbl_backup.config(text=msg, fg="#ffd9a0")
+
+    def _rodar_diagnostico(self):
+        from core import diagnostico
+        self.lbl_diag.config(text="testando…")
+        self.txt_diag.configure(state=tk.NORMAL)
+        self.txt_diag.delete("1.0", tk.END)
+        self.txt_diag.configure(state=tk.DISABLED)
+
+        def run():
+            try:
+                resultados = diagnostico.rodar()
+            except Exception as e:
+                resultados = [("diagnóstico", False, f"falhou: {e}")]
+            self.after(0, lambda: self._mostrar_diagnostico(resultados))
+
+        import threading
+        threading.Thread(target=run, daemon=True).start()
+
+    def _mostrar_diagnostico(self, resultados):
+        linhas = []
+        ok_total = 0
+        for nome, ok, detalhe in resultados:
+            marca = "✓" if ok else "✗"
+            ok_total += 1 if ok else 0
+            linhas.append(f"{marca} {nome} — {detalhe}")
+        self.txt_diag.configure(state=tk.NORMAL)
+        self.txt_diag.delete("1.0", tk.END)
+        self.txt_diag.insert("1.0", f"{ok_total}/{len(resultados)} prontas\n" +
+                             "\n".join(linhas))
+        self.txt_diag.configure(state=tk.DISABLED)
+        self.lbl_diag.config(text=f"{ok_total}/{len(resultados)} ferramentas prontas")
+
     def _secao(self, txt: str):
         tk.Label(self, text=txt, bg="#0d0708", fg="#ff5a4d",
                  font=("Consolas", 10, "bold")).pack(fill=tk.X, padx=24, pady=(12, 4))
@@ -339,7 +497,17 @@ class PainelConfig(tk.Toplevel):
         cfg["cerebro"] = self.var_cerebro.get()
         cfg["ollama_model"] = self.cmb_modelo.get()
         cfg["tema"] = self.var_tema.get()
+        cfg["nome_usuario"] = self.var_nome_usuario.get().strip() or "André"   # v4.14.0
+        cfg["nome_assistente"] = self.var_nome_assistente.get().strip() or "J.A.R.V.I.S"
+        cfg["estilo"] = self.var_estilo.get()
+        cfg["modo_economico"] = bool(self.var_economica.get())
+        cfg["whisper_tamanho"] = self.var_whisper.get()
         config.save(cfg)
+        try:
+            from core import tools as _tools
+            _tools.set_cfg(cfg)
+        except Exception:
+            pass
         self.lbl_teste.config(text="testando…", fg="#9c8a86")
         threading.Thread(target=self._testar_chave, args=(chave,), daemon=True).start()
 
@@ -484,6 +652,23 @@ class PainelConfig(tk.Toplevel):
             for m in self._memorias[-30:]:
                 texto = f"{m.get('data', '')} — {m.get('texto', '')[:60]}"
                 self.lista_mem.insert(tk.END, texto)
+
+    def _editar_memoria(self):
+        """v4.14.0: editor de memórias — reescreve o texto mantendo a data."""
+        from core import memory as mem
+        from tkinter import simpledialog
+        sel = self.lista_mem.curselection()
+        if not sel:
+            self.lbl_mem_status.config(text="selecione uma memória na lista")
+            return
+        m = self._memorias[-(self.lista_mem.size() - sel[0])]
+        novo = simpledialog.askstring("Editar memória", "Novo texto:",
+                                      initialvalue=m.get("texto", ""),
+                                      parent=self)
+        if novo and novo.strip() and novo.strip() != m.get("texto"):
+            mem.atualizar(m.get("texto", ""), novo.strip())
+            self.lbl_mem_status.config(text="memória atualizada")
+            self._carregar_memorias()
 
     def _apagar_memoria(self):
         from core import memory as mem

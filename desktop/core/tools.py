@@ -21,6 +21,9 @@ on_timer_fire = None
 # v4.12.0: ver_tela precisa da chave do Gemini — main.py liga no boot
 _cfg: dict = {}
 
+# v4.14.0: ler_em_voz_alta fala por aqui — main.py liga self.voz.falar
+on_falar = lambda texto: None
+
 
 def set_cfg(cfg: dict) -> None:
     global _cfg
@@ -78,6 +81,13 @@ def declarations() -> list:
               {"type": "object", "properties": {"nome": {"type": "string", "description": "Nome ou parte do nome do arquivo"}, "pasta": {"type": "string", "enum": ["todas", "desktop", "documentos", "downloads", "imagens", "musicas", "videos"], "description": "Onde procurar (opcional; padrão: todas)"}}, "required": ["nome"]}),
         _decl("controlar_midia", "Controla o player de mídia do PC (o que estiver tocando: Spotify, YouTube no navegador, Media Player): play/pause, próxima faixa ou faixa anterior.",
               {"type": "object", "properties": {"acao": {"type": "string", "enum": ["play_pause", "proxima", "anterior"], "description": "Ação do player"}}, "required": ["acao"]}),
+        _decl("ler_em_voz_alta", "Lê em voz alta um texto ou arquivo txt/pdf do PC. Use quando o senhor mandar conteúdo e pedir pra ler, ou disser 'leia isso'.",
+              {"type": "object", "properties": {"texto": {"type": "string", "description": "Texto puro pra ler em voz alta"}, "arquivo": {"type": "string", "description": "Caminho de um .txt ou .pdf (opcional, se não passar texto)"}}, "required": []}),
+        _decl("bloquear_tela", "Bloqueia a tela do computador agora (equivalente a Win+L)."),
+        _decl("limpar_lixeira", "Esvazia a lixeira do Windows (irreversível — pede confirmação)."),
+        _decl("info_disco", "Informa o espaço total e livre do disco principal."),
+        _decl("pesquisar_resumido", "Pesquisa na web e devolve um RESUMO com fontes em vez de só abrir o navegador. Com chave do Gemini o resumo é inteligente; sem chave devolve tópicos e links.",
+              {"type": "object", "properties": {"busca": {"type": "string", "description": "O que pesquisar"}, "pergunta": {"type": "string", "description": "Pergunta específica que o resumo deve responder (opcional)"}}, "required": ["busca"]}),
     ]
 
 
@@ -90,7 +100,8 @@ def nomes() -> set:
             "abrir_app", "lembrar_fato", "listar_memorias", "definir_timer",
             "desfazer_ultima_acao", "agendar_aviso", "listar_agenda",
             "cancelar_aviso", "ver_tela", "procurar_arquivos",
-            "controlar_midia"}
+            "controlar_midia", "ler_em_voz_alta", "bloquear_tela",
+            "limpar_lixeira", "info_disco", "pesquisar_resumido"}
 
 
 def execute(name: str, args: dict) -> str:
@@ -115,6 +126,11 @@ def execute(name: str, args: dict) -> str:
         "ver_tela": lambda: _ver_tela(args.get("pergunta", "")),
         "procurar_arquivos": lambda: _procurar_arquivos(args.get("nome", ""), args.get("pasta", "todas")),
         "controlar_midia": lambda: _controlar_midia(args.get("acao", "play_pause")),
+        "ler_em_voz_alta": lambda: _ler_voz_alta(args.get("texto", ""), args.get("arquivo", "")),
+        "bloquear_tela": lambda: _bloquear_tela(),
+        "limpar_lixeira": lambda: _limpar_lixeira(),
+        "info_disco": lambda: _info_disco(),
+        "pesquisar_resumido": lambda: _pesquisar_resumido(args.get("busca", ""), args.get("pergunta", "")),
     }.get(name)
     if fn is None:
         return f"tool desconhecida: {name}"
@@ -500,3 +516,133 @@ def _controlar_midia(acao: str) -> str:
         return msgs[acao] + "."
     return ("o controle de mídia por tecla funciona no Windows, senhor — "
             "neste sistema eu ainda não consigo apertar as teclas de mídia.")
+
+
+# ==================== LER EM VOZ ALTA (v4.14.0) ====================
+
+def _ler_voz_alta(texto: str, arquivo: str) -> str:
+    """Lê texto puro ou arquivo (txt/pdf) em voz alta, na fila da voz."""
+    conteudo = (texto or "").strip()
+    if not conteudo and arquivo:
+        from pathlib import Path as _P
+        try:
+            alvo = _P(arquivo).expanduser()
+            if alvo.suffix.lower() == ".pdf":
+                try:
+                    from pypdf import PdfReader
+                except ImportError:
+                    return ("pra ler PDF eu preciso da biblioteca pypdf, senhor — "
+                            "instale com: pip install pypdf")
+                paginas = PdfReader(str(alvo))
+                conteudo = " ".join((p.extract_text() or "")
+                                    for p in paginas[:12]).strip()
+            else:
+                try:
+                    conteudo = alvo.read_text(encoding="utf-8").strip()
+                except UnicodeDecodeError:
+                    conteudo = alvo.read_text(encoding="latin-1").strip()
+        except Exception as e:
+            return f"não consegui abrir '{arquivo}': {e}"
+    if not conteudo:
+        return "nada pra ler, senhor — mande um texto ou o caminho de um arquivo."
+    trecho = conteudo[:3000]  # fala em fatias com a v4.10.8; 3000 já é um capítulo
+    on_falar(trecho)
+    return ("lendo em voz alta, senhor." +
+            (" (texto truncado nos 3000 primeiros caracteres)"
+             if len(conteudo) > 3000 else ""))
+
+
+# ==================== COMANDOS DO PC (v4.14.0) ====================
+
+def _bloquear_tela() -> str:
+    import sys
+    try:
+        if sys.platform.startswith("win"):
+            import ctypes
+            ctypes.windll.user32.LockWorkStation()
+            return "tela bloqueada, senhor."
+        if sys.platform == "darwin":
+            import subprocess
+            subprocess.run(["pmset", "displaysleepnow"], check=False, timeout=5)
+            return "tela bloqueada, senhor."
+        import subprocess
+        r = subprocess.run(["loginctl", "lock-session"], capture_output=True, timeout=5)
+        if r.returncode == 0:
+            return "tela bloqueada, senhor."
+        return "não consegui bloquear a sessão neste sistema, senhor."
+    except Exception as e:
+        return f"não consegui bloquear a tela: {e}"
+
+
+def _limpar_lixeira() -> str:
+    import sys
+    if not sys.platform.startswith("win"):
+        return "a limpeza da lixeira só funciona no Windows, senhor."
+    try:
+        import subprocess
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"],
+            capture_output=True, timeout=60)
+        if r.returncode != 0:
+            return f"o PowerShell não limpou a lixeira (código {r.returncode}), senhor."
+        return "lixeira esvaziada, senhor."
+    except Exception as e:
+        return f"não consegui limpar a lixeira: {e}"
+
+
+def _info_disco() -> str:
+    import shutil
+    import sys
+    from pathlib import Path
+    if sys.platform.startswith("win"):
+        alvo = Path(sys.executable).anchor or "C:\\"
+    else:
+        alvo = "/"
+    total, usado, livre = shutil.disk_usage(alvo)
+    gb = 1024 ** 3
+    pct_livre = livre / total * 100 if total else 0
+    return (f"Disco {alvo}: {total / gb:.0f} GB no total, "
+            f"{livre / gb:.0f} GB livres ({pct_livre:.0f}% livre), senhor.")
+
+
+# ==================== BUSCA COM RESUMO (v4.14.0) ====================
+
+def _pesquisar_resumido(busca: str, pergunta: str = "") -> str:
+    """Busca no DuckDuckGo (sem chave) e resume: com Gemini o resumo é
+    redigido com as fontes; sem chave devolve tópicos + links honestos."""
+    termo = (busca or "").strip()
+    if not termo:
+        return "diga o que pesquisar, senhor."
+    try:
+        try:
+            from ddgs import DDGS          # pacote novo (duckduckgo-search renomeou)
+        except ImportError:
+            from duckduckgo_search import DDGS
+        achados = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(termo, region="br-pt", max_results=5):
+                achados.append({"titulo": r.get("title", ""),
+                                "trecho": r.get("body", ""),
+                                "url": r.get("href", "")})
+    except Exception as e:
+        return f"a busca falhou ({str(e)[:60]}), senhor — tente de novo em instantes."
+    if not achados:
+        return f"não achei nada sobre '{termo}', senhor."
+    if not _cfg.get("gemini_api_key"):
+        linhas = [f"- {a['titulo'][:70]} — {a['trecho'][:130]}\n  {a['url']}"
+                  for a in achados[:4]]
+        return ("Sem a chave do Gemini eu não redijo o resumo, senhor — "
+                "tópicos e fontes:\n" + "\n".join(linhas))
+    try:
+        material = "\n".join(f"[{i+1}] {a['titulo']}\n{a['trecho'][:250]}\n({a['url']})"
+                            for i, a in enumerate(achados[:5]))
+        prompt = (f"Você é o JARVIS. Busquei na web por '{termo}'. Resultados:\n"
+                  f"{material}\n\n"
+                  f"Escreva um resumo curto (3-5 frases) em português do Brasil "
+                  f"respondendo: {pergunta or termo}. "
+                  "Cite as fontes pelo número [n] e o link ao final de cada frase que usar. "
+                  "Se os resultados não responderem, diga honestamente.")
+        return gemini_client.vision_free(_cfg["gemini_api_key"], prompt)
+    except Exception as e:
+        return (f"o resumo com IA falhou ({str(e)[:60]}), senhor — tópicos:\n"
+                + "\n".join(f"- {a['titulo'][:70]} — {a['url']}" for a in achados[:4]))

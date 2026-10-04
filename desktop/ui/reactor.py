@@ -97,7 +97,8 @@ class ArcReactorHud(tk.Canvas):
                 self._bat = round(bat.percent) if bat else None
             except Exception:
                 pass
-        self.after(2000, self._atualiza_leituras)
+        self.after(8000 if getattr(self, "economia", False) else 2000,
+                   self._atualiza_leituras)
 
     # ---------- loop de animação ----------
 
@@ -124,7 +125,9 @@ class ArcReactorHud(tk.Canvas):
         else:
             self._frame_arc(cx, cy, r, el)
 
-        self.after(40, self._frame)  # ~25 fps — reagenda sempre, uma única vez
+        # v4.14.0: modo econômico corta o fps pela metade (PC fraco)
+        intervalo = 85 if getattr(self, "economia", False) else 40
+        self.after(intervalo, self._frame)  # reagenda sempre, uma única vez
 
     def _frame_radar(self, cx, cy, r, el):
         """HOLOGRAMA CIRCULAR da foto: núcleo teal, anel azul, branco nos

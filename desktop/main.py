@@ -52,6 +52,7 @@ class JarvisApp(tk.Tk):
         # o timer das tools avisa por aqui
         tools.on_timer_fire = self._timer_disparou
         tools.set_cfg(self.cfg)   # v4.12.0: ver_tela usa a chave do Gemini
+        tools.on_falar = self.voz.falar   # v4.14.0: ler_em_voz_alta
 
         # v4.12.0: viga dos avisos agendados (agenda.json em disco) — os
         # atrasados de quando o app estava fechado disparam no boot
@@ -59,6 +60,10 @@ class JarvisApp(tk.Tk):
 
         # v4.13.0: briefing matinal — bom-dia com clima e agenda (1x/dia)
         self.after(2500, self._briefing_do_boot)
+
+        # v4.14.0: modo econômico corta o fps do holograma pela metade
+        self.after(300, lambda: setattr(self.reator, "economia",
+                                       bool(self.cfg.get("modo_economico"))))
 
         # ---------- FUSÃO MARK LIII: registro de ações auto-descritivas ----------
         self.registro = discover_actions(
@@ -399,6 +404,23 @@ class JarvisApp(tk.Tk):
             self.wake.pausar()   # solta o microfone pro STT
 
         def run():
+            # v4.14.0: Whisper LOCAL é o motor preferido do 🎙 — 1ª vez
+            # auto-instala e baixa o modelo, sempre avisando na cara
+            try:
+                from core import ditado
+                if not ditado._lib_ok():
+                    self._status("instalando o Whisper local…")
+                    ok, msg = ditado.garantir()
+                    if not ok:
+                        self.fila_eventos.put((
+                            "aviso",
+                            "O ditado OFFLINE precisa do Whisper e não consegui "
+                            f"instalar: {msg}\nVou usar o reconhecimento ONLINE "
+                            "do Google por enquanto."))
+                elif not ditado.modelo_instalado():
+                    self._status("baixando o modelo do Whisper (só na 1ª vez)…")
+            except Exception:
+                pass
             texto = stt.ouvir()
             if pausar_wake and self.wake.ligado:
                 self.after(200, self.wake.retomar)  # devolve o microfone ao detector
@@ -463,6 +485,8 @@ class JarvisApp(tk.Tk):
                     _, frase = item
                     self.chat.add("sistema", f"« {frase} »")
                     self.voz.falar(frase)
+                elif isinstance(item, tuple) and item[0] == "aviso":
+                    messagebox.showinfo("J.A.R.V.I.S", item[1], parent=self)
                 elif isinstance(item, tuple) and item[0] == "briefing":
                     _, msg = item
                     self.chat.add("jarvis", msg)

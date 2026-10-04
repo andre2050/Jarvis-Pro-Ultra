@@ -62,6 +62,17 @@ def dados() -> list[dict]:
     return _load().get("memorias", [])
 
 
+def atualizar(texto_velho: str, texto_novo: str) -> str:
+    """v4.14.0: editor de memórias do CONFIG — reescreve o texto mantendo a data."""
+    data = _load()
+    for m in data.get("memorias", []):
+        if m.get("texto") == texto_velho:
+            m["texto"] = texto_novo.strip()
+            _save(data)
+            return "Memória atualizada, senhor."
+    return "não encontrei essa memória, senhor."
+
+
 def esquecer(texto: str) -> str:
     """Apaga a memória cujo texto bate exatamente (para o painel)."""
     data = _load()

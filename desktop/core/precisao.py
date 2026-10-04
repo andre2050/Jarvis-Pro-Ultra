@@ -77,6 +77,8 @@ def avalia_risco(name: str, args) -> tuple | None:
     pode executar direto. Só o GENUINAMENTE irreversível/externo."""
     a = json.dumps(args or {}, ensure_ascii=False, default=str)
     baixa = a.lower()
+    if name == "limpar_lixeira":
+        return "Limpar a lixeira", "A lixeira INTEIRA será esvaziada — irreversível"
     if name == "file_controller" and any(
             p in baixa for p in ("delete", "apagar", "trash", "mover", "move",
                                  "rename", "renomear")):

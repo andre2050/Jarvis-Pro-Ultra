@@ -134,3 +134,28 @@ def vision(api_key: str, prompt: str, b64: str, mime: str = "image/jpeg") -> str
         except (KeyError, IndexError, TypeError):
             raise GeminiHttpError(500, f"Resposta inesperada do Gemini: {json.dumps(data)[:220]}")
     raise GeminiHttpError(404, "nenhum modelo de visão disponível")
+
+
+def vision_free(api_key: str, prompt: str) -> str:
+    """v4.14.0: rodada de texto puro sem imagem e sem tools — usada pelo
+    resumo inteligente da busca (mesma cadeia de modelos do chat)."""
+    for model in MODELS:
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.5, "maxOutputTokens": 1024},
+        }
+        resp = requests.post(BASE_URL.format(model=model, key=api_key), json=body,
+                             timeout=(20, 60),
+                             headers={"Content-Type": "application/json"})
+        if resp.status_code == 404:
+            continue
+        if resp.status_code != 200:
+            raise GeminiHttpError(resp.status_code,
+                                  f"HTTP {resp.status_code}: {resp.text[:220]}")
+        data = resp.json()
+        try:
+            return (data["candidates"][0]["content"]["parts"][0].get("text")
+                    or "").strip()
+        except (KeyError, IndexError, TypeError):
+            raise GeminiHttpError(500, f"Resposta inesperada do Gemini: {json.dumps(data)[:220]}")
+    raise GeminiHttpError(404, "nenhum modelo disponível")
