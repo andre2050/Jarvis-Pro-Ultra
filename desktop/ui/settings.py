@@ -271,6 +271,10 @@ class PainelConfig(tk.Toplevel):
         self.var_estilo = tk.StringVar(value=cfg_atual.get("estilo", "formal"))
         self.var_economica = tk.BooleanVar(value=bool(cfg_atual.get("modo_economico", False)))
         self.var_whisper = tk.StringVar(value=cfg_atual.get("whisper_tamanho", "base"))
+        # v4.14.2
+        self.var_economia_auto = tk.BooleanVar(value=bool(cfg_atual.get("economia_auto", False)))
+        self.var_economia_bateria = tk.StringVar(value=str(cfg_atual.get("economia_bateria", 40)))
+        self.var_atalho_voz = tk.StringVar(value=cfg_atual.get("atalho_voz", "<F4>"))
         tk.Label(zona_p, text="Seu nome:", fg="#f2e6e4", bg="#171012",
                  font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", padx=10, pady=4)
         tk.Entry(zona_p, textvariable=self.var_nome_usuario, bg="#0d0708",
@@ -313,6 +317,111 @@ class PainelConfig(tk.Toplevel):
                        selectcolor="#0d0708", activebackground="#171012",
                        font=("Segoe UI", 9),
                        command=self._aplicar_economia).pack(anchor="w", padx=10, pady=(0, 8))
+
+        # ---------- MODO ECONÔMICO AUTOMÁTICO (v4.14.2) ----------
+        tk.Checkbutton(zona_e, text="Ligar sozinho quando a bateria cair abaixo de",
+                       variable=self.var_economia_auto, bg="#171012", fg="#f2e6e4",
+                       selectcolor="#0d0708", activebackground="#171012",
+                       font=("Segoe UI", 9)).pack(anchor="w", padx=10)
+        linha_bat = tk.Frame(zona_e, bg="#171012")
+        linha_bat.pack(anchor="w", padx=10, pady=(0, 8))
+        tk.Entry(linha_bat, textvariable=self.var_economia_bateria, width=4,
+                 bg="#1d1214", fg="#f2e6e4", insertbackground="#f2e6e4",
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        tk.Label(linha_bat, text="% de bateria (só em notebook, com bateria)",
+                 fg="#9c8a86", bg="#171012", font=("Segoe UI", 8)).pack(side=tk.LEFT, padx=6)
+
+        # ---------- GERENCIADOR DE PLUGINS (v4.14.2) ----------
+        self._secao("🔌 GERENCIADOR DE PLUGINS — ligue/desligue funções")
+        zona_pl = tk.Frame(self, bg="#171012")
+        zona_pl.pack(fill=tk.X, padx=24)
+        tk.Label(zona_pl, text=("Desligada, a função nem aparece pro cérebro — ele não tenta\n"
+                                "chamar. Ligar de volta aplica na hora, sem reiniciar."),
+                 fg="#9c8a86", bg="#171012", font=("Segoe UI", 8),
+                 justify=tk.LEFT).pack(anchor="w", padx=10, pady=(6, 2))
+        grade = tk.Frame(zona_pl, bg="#171012")
+        grade.pack(fill=tk.X, padx=10, pady=(0, 8))
+        self._plugin_vars: dict[str, tk.BooleanVar] = {}
+        desligadas = set(cfg_atual.get("tools_desligadas") or [])
+        de_todos = self._todas_tools_declaradas()
+        for idx, decl in enumerate(de_todos):
+            nome = decl["name"]
+            var = tk.BooleanVar(value=nome not in desligadas)
+            self._plugin_vars[nome] = var
+            desc = (decl.get("description") or "").strip()
+            rot = nome.replace("_", " ")
+            celula = tk.Frame(grade, bg="#171012")
+            celula.grid(row=idx // 2, column=idx % 2, sticky="w",
+                        padx=(0, 10), pady=1)
+            tk.Checkbutton(celula, text=rot, variable=var, bg="#171012",
+                           fg="#f2e6e4", selectcolor="#0d0708",
+                           activebackground="#171012", font=("Segoe UI", 8),
+                           onvalue=True, offvalue=False).pack(anchor="w")
+            tk.Label(celula, text=desc[:70] + ("…" if len(desc) > 70 else ""),
+                     fg="#6a5750", bg="#171012", font=("Segoe UI", 7),
+                     wraplength=200, justify=tk.LEFT).pack(anchor="w")
+
+        # ---------- AGENDA (v4.14.2) ----------
+        self._secao("📅 AGENDA — avisos agendados")
+        zona_ag = tk.Frame(self, bg="#171012")
+        zona_ag.pack(fill=tk.X, padx=24)
+        self.zona_agenda = tk.Frame(zona_ag, bg="#171012")
+        self.zona_agenda.pack(fill=tk.X, padx=10, pady=(6, 4))
+        self.lbl_agenda = tk.Label(zona_ag, text="", fg="#9c8a86", bg="#171012",
+                                   font=("Segoe UI", 8))
+        self.lbl_agenda.pack(anchor="w", padx=10, pady=(0, 4))
+        tk.Button(zona_ag, text="Atualizar lista", command=self._atualizar_agenda,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(anchor="w", padx=10, pady=(0, 8))
+        self._atualizar_agenda()
+
+        # ---------- LOG DE ERROS (v4.14.2) ----------
+        self._secao("🧯 LOG DE ERROS — veja e exporte quando algo bugar")
+        zona_log = tk.Frame(self, bg="#171012")
+        zona_log.pack(fill=tk.X, padx=24)
+        barra_log = tk.Frame(zona_log, bg="#171012")
+        barra_log.pack(anchor="w", padx=10, pady=(6, 4))
+        tk.Button(barra_log, text="Ver log de erros", command=self._ver_log_erros,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
+        tk.Button(barra_log, text="Exportar cópia", command=self._exportar_log,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=6)
+        self.lbl_log = tk.Label(zona_log, text="", fg="#9c8a86", bg="#171012",
+                               font=("Segoe UI", 8), wraplength=380)
+        self.lbl_log.pack(anchor="w", padx=10, pady=(0, 4))
+
+        # ---------- ATALHO DA VOZ (v4.14.2) ----------
+        self._secao("⌨️ ATALHO DA VOZ — liga/desliga a escuta")
+        zona_at = tk.Frame(self, bg="#171012")
+        zona_at.pack(fill=tk.X, padx=24)
+        self.lbl_atalho = tk.Label(zona_at, textvariable=self.var_atalho_voz,
+                                   fg="#ffd9a0", bg="#171012", font=("Consolas", 10, "bold"))
+        self.lbl_atalho.pack(anchor="w", padx=10, pady=(6, 2))
+        tk.Button(zona_at, text="Gravar novo atalho", command=self._gravar_atalho,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(anchor="w", padx=10, pady=(0, 8))
+
+        # ---------- DEPENDÊNCIAS (v4.14.2) ----------
+        self._secao("📦 DEPENDÊNCIAS — o que está instalado e o que falta")
+        zona_dp = tk.Frame(self, bg="#171012")
+        zona_dp.pack(fill=tk.BOTH, padx=24)
+        barra_dp = tk.Frame(zona_dp, bg="#171012")
+        barra_dp.pack(fill=tk.X, pady=(6, 4))
+        tk.Button(barra_dp, text="Verificar agora", command=self._verificar_deps,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT)
+        tk.Button(barra_dp, text="Instalar faltantes", command=self._instalar_deps,
+                  bg="#241408", fg="#ffd9a0", bd=0, font=("Segoe UI", 9),
+                  cursor="hand2", padx=10, pady=3).pack(side=tk.LEFT, padx=6)
+        self.lbl_deps = tk.Label(barra_dp, text="", fg="#9c8a86", bg="#171012",
+                                font=("Segoe UI", 8))
+        self.lbl_deps.pack(side=tk.LEFT, padx=8)
+        self.txt_deps = tk.Text(zona_dp, height=6, bg="#0d0708", fg="#f2e6e4",
+                                font=("Consolas", 8), bd=0, wrap="word")
+        self.txt_deps.pack(fill=tk.X, padx=10, pady=(0, 8))
+        self.txt_deps.insert("1.0", "Toque em \"Verificar agora\" pra checar o que está instalado.")
+        self.txt_deps.configure(state=tk.DISABLED)
 
         # ---------- BACKUP (v4.14.0) ----------
         self._secao("💾 BACKUP — a vida do JARVIS em um arquivo")
@@ -478,6 +587,220 @@ class PainelConfig(tk.Toplevel):
         self.txt_diag.configure(state=tk.DISABLED)
         self.lbl_diag.config(text=f"{ok_total}/{len(resultados)} ferramentas prontas")
 
+    # ==================== v4.14.2: GERENCIADOR DE PLUGINS ====================
+
+    def _todas_tools_declaradas(self) -> list[dict]:
+        """Declarações completas: tools nativas + ações do registro
+        (plugins .py da pasta actions), sem filtrar as desligadas."""
+        from core import tools
+        de_todos = list(tools.declarations())
+        registro = getattr(getattr(self, "app", None), "registro", None)
+        if registro is not None:
+            try:
+                de_todos += list(registro.get_tool_declarations())
+            except Exception:
+                pass
+        return de_todos
+
+    def _plugins_escolhidos_desligados(self) -> list[str]:
+        return [n for n, v in getattr(self, "_plugin_vars", {}).items()
+                if not v.get()]
+
+    # ==================== v4.14.2: AGENDA ====================
+
+    def _atualizar_agenda(self):
+        from core import agenda
+        for filho in self.zona_agenda.winfo_children():
+            filho.destroy()
+        avisos = agenda.itens()
+        if not avisos:
+            self.lbl_agenda.config(text="Nenhum aviso agendado, senhor.")
+            return
+        self.lbl_agenda.config(text=f"{len(avisos)} aviso(s) agendado(s):")
+        for a in avisos:
+            linha = tk.Frame(self.zona_agenda, bg="#171012")
+            linha.pack(fill=tk.X, pady=1)
+            quando = (a.get("quando") or "")[:16].replace("T", " ")
+            tk.Label(linha, text=f"#{a.get('id')} · {a.get('motivo')} · {quando}",
+                     fg="#f2e6e4", bg="#171012", font=("Segoe UI", 8),
+                     wraplength=330, justify=tk.LEFT).pack(side=tk.LEFT)
+            tk.Button(linha, text="Editar", command=lambda av=a: self._editar_aviso(av),
+                      bg="#1d1610", fg="#ffd9a0", bd=0, font=("Segoe UI", 7),
+                      cursor="hand2", padx=6).pack(side=tk.LEFT, padx=3)
+            tk.Button(linha, text="Cancelar", command=lambda av=a: self._cancelar_aviso(av),
+                      bg="#2a0d0d", fg="#ff9a8f", bd=0, font=("Segoe UI", 7),
+                      cursor="hand2", padx=6).pack(side=tk.LEFT)
+
+    def _editar_aviso(self, aviso):
+        from tkinter import simpledialog
+        ident = aviso.get("id")
+        novo_h = simpledialog.askstring(
+            "J.A.R.V.I.S", "Novo horário (vazio mantém o atual)\n\n"
+            "Formatos: 18:30 · amanhã 9:00 · 25/12 08:00",
+            parent=self, initialvalue=aviso.get("quando", "")[:16].replace("T", " "))
+        if novo_h is None:
+            return
+        novo_m = simpledialog.askstring(
+            "J.A.R.V.I.S", "Novo motivo (vazio mantém o atual):",
+            parent=self, initialvalue=aviso.get("motivo", ""))
+        if novo_m is None:
+            return
+        from core import agenda
+        msg = agenda.editar(ident, novo_h, novo_m)
+        self._atualizar_agenda()
+        if "não encontrei" in msg or "não entendi" in msg:
+            from tkinter import messagebox
+            messagebox.showwarning("J.A.R.V.I.S", msg, parent=self)
+
+    def _cancelar_aviso(self, aviso):
+        from tkinter import messagebox
+        from core import agenda
+        if not messagebox.askyesno("J.A.R.V.I.S",
+                                   f"Cancelar o aviso \"{aviso.get('motivo')}\"?",
+                                   parent=self):
+            return
+        agenda.cancelar(aviso.get("id"))
+        self._atualizar_agenda()
+
+    # ==================== v4.14.2: LOG DE ERROS ====================
+
+    def _caminho_log(self):
+        from core.config import CONFIG_DIR
+        return CONFIG_DIR / "erro.log"
+
+    def _ver_log_erros(self):
+        import tkinter.scrolledtext as st
+        log = self._caminho_log()
+        win = tk.Toplevel(self)
+        win.title("J.A.R.V.I.S — log de erros")
+        win.configure(bg="#171012")
+        win.geometry("640x420")
+        txt = st.ScrolledText(win, bg="#0d0708", fg="#f2e6e4",
+                              font=("Consolas", 9), bd=0)
+        txt.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        if log.exists():
+            try:
+                conteudo = log.read_text(encoding="utf-8", errors="replace")[-20000:]
+            except Exception as e:
+                conteudo = f"não consegui ler o log: {e}"
+            txt.insert("1.0", conteudo)
+            self.lbl_log.config(text=f"log: {log}")
+        else:
+            txt.insert("1.0", "Nenhum erro registrado até agora, senhor — o log "
+                              "só nasce quando algo falha.")
+            self.lbl_log.config(text="sem log (nada quebrou ainda)")
+        txt.configure(state=tk.DISABLED)
+
+    def _exportar_log(self):
+        from tkinter import filedialog
+        log = self._caminho_log()
+        if not log.exists():
+            self.lbl_log.config(text="nada pra exportar — o log ainda não existe")
+            return
+        alvo = filedialog.asksaveasfilename(
+            parent=self, defaultextension=".log",
+            initialfile="jarvis-erro.log", filetypes=[("Log", "*.log"), ("Tudo", "*.*")])
+        if not alvo:
+            return
+        try:
+            import shutil
+            shutil.copy(log, alvo)
+            self.lbl_log.config(text=f"cópia salva em {alvo}")
+        except Exception as e:
+            self.lbl_log.config(text=f"falhou ao exportar: {e}")
+
+    # ==================== v4.14.2: ATALHO DA VOZ ====================
+
+    def _gravar_atalho(self):
+        """Captura a PRÓXIMA combinação de teclas e vira o atalho da voz."""
+        self._capturando = True
+        self.lbl_atalho.config(text="aperte a combinação agora…")
+        self.focus_force()
+        self.bind("<KeyPress>", self._captura_atalho, add=True)
+
+    def _captura_atalho(self, ev):
+        if not getattr(self, "_capturando", False):
+            return
+        # ignora modificadores puros (Ctrl, Shift, Alt sozinhos)
+        if ev.keysym == "Escape":        # desiste: mantém o atalho anterior
+            self._fim_captura()
+            return
+        if ev.keysym in ("Control_L", "Control_R", "Shift_L", "Shift_R",
+                         "Alt_L", "Alt_R", "AltGr", "Caps_Lock"):
+            return
+        partes = []
+        if ev.state & 0x0004:
+            partes.append("Control")
+        if ev.state & 0x0008 or ev.state & 0x0080:
+            partes.append("Alt")
+        if ev.state & 0x0001:
+            partes.append("Shift")
+        tecla = ev.keysym
+        if len(tecla) == 1:
+            tecla = tecla.lower()
+        partes.append(tecla)
+        novo = "<" + "-".join(partes) + ">"
+        self.var_atalho_voz.set(novo)
+        self._fim_captura()
+
+    def _fim_captura(self):
+        self._capturando = False
+        try:
+            self.unbind("<KeyPress>", self._captura_atalho)
+        except Exception:
+            pass
+        self.lbl_atalho.config(textvariable=self.var_atalho_voz)
+
+    # ==================== v4.14.2: DEPENDÊNCIAS ====================
+
+    def _verificar_deps(self):
+        from core import deps as dep_mod
+        res = dep_mod.status()
+        linhas, faltando = [], []
+        for r in res:
+            marca = "✓" if r["ok"] else "✗"
+            linhas.append(f"{marca} {r['rotulo']} — {'' if r['ok'] else r['motivo']}"
+                          + ("" if r["ok"] else f"  (pra: {r['para']})"))
+            if not r["ok"]:
+                faltando.append(r["pip"])
+        self.txt_deps.configure(state=tk.NORMAL)
+        self.txt_deps.delete("1.0", tk.END)
+        self.txt_deps.insert("1.0", "\n".join(linhas))
+        self.txt_deps.configure(state=tk.DISABLED)
+        ok_n = sum(1 for r in res if r["ok"])
+        self.lbl_deps.config(text=f"{ok_n}/{len(res)} instaladas"
+                             + (f" · {len(faltando)} faltando" if faltando else " · tudo em ordem"))
+        self._deps_faltantes = faltando
+
+    def _instalar_deps(self):
+        from core import deps as dep_mod
+        faltando = getattr(self, "_deps_faltantes", None)
+        if not faltando:
+            self._verificar_deps()
+            faltando = getattr(self, "_deps_faltantes", [])
+        if not faltando:
+            self.lbl_deps.config(text="nada pra instalar, senhor — tudo aí.")
+            return
+        self.lbl_deps.config(text=f"instalando {len(faltando)} pacote(s)…")
+        self.txt_deps.configure(state=tk.NORMAL)
+        self.txt_deps.delete("1.0", tk.END)
+        self.txt_deps.configure(state=tk.DISABLED)
+
+        def escrever(linha):
+            def _poe():
+                self.txt_deps.configure(state=tk.NORMAL)
+                self.txt_deps.insert(tk.END, linha + "\n")
+                self.txt_deps.see(tk.END)
+                self.txt_deps.configure(state=tk.DISABLED)
+            self.after(0, _poe)
+
+        def run():
+            dep_mod.instalar(list(faltando), log=escrever)
+            self.after(0, self._verificar_deps)
+
+        import threading
+        threading.Thread(target=run, daemon=True).start()
+
     def _secao(self, txt: str):
         tk.Label(self, text=txt, bg="#0d0708", fg="#ff5a4d",
                  font=("Consolas", 10, "bold")).pack(fill=tk.X, padx=24, pady=(12, 4))
@@ -503,6 +826,14 @@ class PainelConfig(tk.Toplevel):
         cfg["estilo"] = self.var_estilo.get()
         cfg["modo_economico"] = bool(self.var_economica.get())
         cfg["whisper_tamanho"] = self.var_whisper.get()
+        # v4.14.2
+        cfg["tools_desligadas"] = self._plugins_escolhidos_desligados()
+        cfg["atalho_voz"] = self.var_atalho_voz.get() or "<F4>"
+        cfg["economia_auto"] = bool(self.var_economia_auto.get())
+        try:
+            cfg["economia_bateria"] = max(5, min(95, int(self.var_economia_bateria.get())))
+        except ValueError:
+            cfg["economia_bateria"] = 40
         config.save(cfg)
         try:
             from core import tools as _tools
@@ -757,6 +1088,14 @@ class PainelConfig(tk.Toplevel):
         cfg["ollama_model"] = self.cmb_modelo.get()
         cfg["tema"] = self.var_tema.get()
         cfg["voz_id"] = self._id_voz_escolhida()
+        # v4.14.2
+        cfg["tools_desligadas"] = self._plugins_escolhidos_desligados()
+        cfg["atalho_voz"] = self.var_atalho_voz.get() or "<F4>"
+        cfg["economia_auto"] = bool(self.var_economia_auto.get())
+        try:
+            cfg["economia_bateria"] = max(5, min(95, int(self.var_economia_bateria.get())))
+        except ValueError:
+            cfg["economia_bateria"] = 40
         config.save(cfg)
         sync_api_keys(cfg)
         self.app.recarregar_config()

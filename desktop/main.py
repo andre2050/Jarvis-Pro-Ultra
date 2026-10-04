@@ -64,6 +64,10 @@ class JarvisApp(tk.Tk):
         # v4.14.0: modo econômico corta o fps do holograma pela metade
         self.after(300, lambda: setattr(self.reator, "economia",
                                        bool(self.cfg.get("modo_economico"))))
+        # v4.14.2: modo econômico AUTOMÁTICO — bateria baixa liga sozinho,
+        # carregador/energia recolhida desliga (não mexe na escolha manual)
+        self._economia_auto_ligada = False
+        self.after(15000, self._viga_economia_auto)
 
         # ---------- FUSÃO MARK LIII: registro de ações auto-descritivas ----------
         self.registro = discover_actions(
@@ -93,7 +97,9 @@ class JarvisApp(tk.Tk):
             self.wake.iniciar()
 
         self.protocol("WM_DELETE_WINDOW", self._sair)
-        self.bind("<F4>", lambda e: self._alternar_voz())
+        # v4.14.2: atalho da voz customizável em ⚙ CONFIG (padrão F4)
+        self._atalho_voz = self.cfg.get("atalho_voz") or "<F4>"
+        self.bind(self._atalho_voz, lambda e: self._alternar_voz())
         self.bind("<F11>", lambda e: self._abrir_mesa())
         self.after(80, self._consumir_eventos)
 
@@ -612,6 +618,36 @@ class JarvisApp(tk.Tk):
                             fg=self.cor("vivo") if self.voz.enabled else self.cor("txt_fraco"))
         self._atualiza_botao_wake()
         self.voz.on_palavra = self.reator.visema_pulso
+
+    def _viga_economia_auto(self):
+        """Checa a bateria a cada 60s e liga/desliga o modo econômico
+        conforme o nível escolhido no ⚙ CONFIG. A escolha MANUAL do
+        CONFIG continua valendo: o automático só age se o manual está
+        desligado, e devolve o controle quando a bateria se recupera."""
+        try:
+            nivel = self.cfg.get("economia_auto")
+            manual = bool(self.cfg.get("modo_economico"))
+            bateria = None
+            plugado = None
+            try:
+                import psutil
+                bat = psutil.sensors_battery()
+                if bat is not None:
+                    bateria, plugado = bat.percent, bat.power_plugged
+            except Exception:
+                pass
+            teto = int(self.cfg.get("economia_bateria") or 40)
+            deve_ligar = bool(nivel) and bateria is not None and not manual \
+                and not plugado and bateria <= teto
+            if deve_ligar and not self._economia_auto_ligada:
+                self._economia_auto_ligada = True
+                self.reator.economia = True
+            elif not deve_ligar and self._economia_auto_ligada:
+                self._economia_auto_ligada = False
+                self.reator.economia = False
+        except Exception:
+            pass
+        self.after(60000, self._viga_economia_auto)
 
     def _sair(self):
         try:

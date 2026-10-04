@@ -6,6 +6,7 @@ devolvemos -> resposta final. Mesma arquitetura do Android v4.3.0.
 import json
 import threading
 
+from . import config as _config_mod
 from . import gemini_client, memory, ollama_client, perception, precisao, tools
 from .adapters import normaliza_schema
 from version import __version__
@@ -31,11 +32,19 @@ def todas_declaracoes() -> list:
     if _registro is not None:
         for d in _registro.get_tool_declarations():
             decls.append(normaliza_schema(d))
+    # v4.14.2: gerenciador de plugins — tools desligadas em ⚙ CONFIG nem
+    # aparecem pro modelo (menos chance de chamar algo fora de serviço)
+    desligadas = set(_config_mod.load().get("tools_desligadas") or [])
+    if desligadas:
+        decls = [d for d in decls if d.get("name") not in desligadas]
     return decls
 
 
 def _executa_raw(name: str, args: dict) -> str:
     """Despacha de verdade: primeiro as tools nativas, depois o registro."""
+    # v4.14.2: gerenciador de plugins — recusa na cara se desligada no CONFIG
+    if name in (_config_mod.load().get("tools_desligadas") or []):
+        return "essa função está desligada no ⚙ CONFIG — ligue o plugin lá, senhor."
     if name in tools.nomes():
         return tools.execute(name, args)
     if _registro is not None and _registro.has(name):

@@ -127,6 +127,30 @@ def cancelar(ident: int) -> str:
     return f"não encontrei o aviso #{ident}, senhor — veja em listar_agenda."
 
 
+def itens() -> list:
+    """v4.14.2: lista CRUA dos avisos (id, quando, motivo) — o painel de
+    agenda do ⚙ CONFIG usa isso pra desenhar os botões de editar/cancelar."""
+    return list(_load().get("avisos", []))
+
+
+def editar(ident: int, horario: str, motivo: str) -> str:
+    """v4.14.2: muda horário e/ou motivo de um aviso já agendado (CONFIG)."""
+    novo = _parse_horario(horario)
+    if horario and novo is None:
+        return f"não entendi o horário '{horario}' — use HH:MM, amanhã HH:MM ou dd/mm HH:MM."
+    data = _load()
+    for a in data.get("avisos", []):
+        if a.get("id") == ident:
+            if novo is not None:
+                a["quando"] = novo.isoformat()
+            if (motivo or "").strip():
+                a["motivo"] = motivo.strip()
+            a["atrasado"] = False
+            _save(data)
+            return f"Ajustado, senhor: {a['motivo']} às {a['quando'][:16].replace('T', ' ')}."
+    return f"não encontrei o aviso #{ident}, senhor."
+
+
 def de_hoje() -> list:
     """[(hora "HH:MM", motivo)] dos avisos agendados pra hoje — pro briefing."""
     hoje = datetime.now().date().isoformat()

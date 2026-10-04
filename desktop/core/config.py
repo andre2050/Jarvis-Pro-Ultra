@@ -16,6 +16,13 @@ DEFAULTS = {
     "tema": "sentinela",      # "sentinela" (padrão v4.14.1) | "novoskin" | "busto" | "radar" | "classico" | "vermelho" | "gold"
     "voz_id": "",              # v5.1.8: voz escolhida em ⚙ CONFIG ("" = automática)
     "voz_natwin": True,        # v4.10.6: Windows prefere TTS nativo (mais confiável)
+    # v4.14.2: gerenciador de plugins — tools desligadas à mão em ⚙ CONFIG
+    "tools_desligadas": [],
+    # v4.14.2: atalho do botão de voz (padrão F4) customizável em ⚙ CONFIG
+    "atalho_voz": "<F4>",
+    # v4.14.2: modo econômico automático quando a bateria cai do nível
+    "economia_auto": False,
+    "economia_bateria": 40,    # % de bateria pra ligar sozinho
 }
 
 
