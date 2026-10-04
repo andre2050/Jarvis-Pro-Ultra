@@ -33,6 +33,29 @@ def _reconhecer(texto: str, executa) -> tuple | None:
         return None
 
     # ---------- respostas diretas (zero tools, zero rede) ----------
+    m = re.fullmatch(r"(?:(?:me\s+)?(?:d[áa]|dê)\s+(?:o\s+)?(?:meu\s+)?briefing|briefing"
+                     r"|resumo\s+do\s+dia|not[íi]cias\s+do\s+dia)\??", tl)
+    if m:
+        from . import briefing
+        return briefing.gerar(), None
+
+    # calculadora: "quanto é 25*48+12" / "calcula 2 mais 2"
+    m = re.fullmatch(r"(?:quanto\s+(?:é|e|dá|da)\s+|calcula(?:r)?\s+)(.{1,60})", tl)
+    if m:
+        r = _calcular(m.group(1))
+        if r is not None:
+            return r, None
+
+    # mídia: pausa/toca/próxima/anterior (qualquer player que esteja tocando)
+    if re.fullmatch(r"(?:pausa|pausar|despausa|despausar|toca|tocar|play|d[áa] play)\s*"
+                    r"(?:a\s+|o\s+)?(?:m[úu]sica|musica|som|player|v[íi]deo)?\??", tl):
+        return executa("controlar_midia", {"acao": "play_pause"}), "midia"
+    if re.fullmatch(r"(?:pr[óo]xima|passa|pula|avan[çc]a)\s+(?:a\s+|o\s+)?"
+                    r"(?:m[úu]sica|musica|faixa|v[íi]deo)\??", tl):
+        return executa("controlar_midia", {"acao": "proxima"}), "midia"
+    if re.fullmatch(r"(?:volta|anterior|retorna)\s+(?:a\s+|o\s+)?"
+                    r"(?:m[úu]sica|musica|faixa)\??", tl):
+        return executa("controlar_midia", {"acao": "anterior"}), "midia"
     if re.fullmatch(r"(que horas?( são?)?|horas?)\??", tl):
         return f"São {datetime.now().strftime('%H:%M')}, senhor.", None
     if re.fullmatch(r"(que dia (é|e) hoje|data( de hoje)?)\??", tl):
@@ -94,3 +117,31 @@ def _reconhecer(texto: str, executa) -> tuple | None:
         return executa("definir_timer", {"segundos": n * mult, "motivo": motivo}), "timer"
 
     return None
+
+
+def _calcular(expressao: str):
+    """Calculadora offline com lista-branca: só passa pra eval o que é
+    número e operador depois de traduzir por extenso. Qualquer letra ou
+    coisa esquisita devolve None (a pergunta segue pro cérebro)."""
+    e = (expressao or "").strip().lower()
+    e = (e.replace("vezes", "*").replace(" x ", "*").replace("x", "*")
+          .replace("×", "*").replace("÷", "/")
+          .replace("dividido por", "/").replace("dividido", "/")
+          .replace("mais", "+").replace("menos", "-")
+          .replace("elevado a", "**").replace("^", "**")
+          .replace(",", "."))
+    e = re.sub(r"[^0-9+\-*/().%\s*]", "", e)
+    e = re.sub(r"\*{3,}", "**", e)
+    e = e.strip()
+    digitos = re.sub(r"\D", "", e)
+    if not e or not digitos or not re.search(r"[+\-*/]", e):
+        return None
+    if len(digitos) > 24:  # bomba de potência gigante: fora
+        return None
+    try:
+        resultado = eval(e, {"__builtins__": None}, {})  # noqa: S307 — whitelist
+    except Exception:
+        return None
+    if isinstance(resultado, float) and resultado.is_integer():
+        resultado = int(resultado)
+    return f"O resultado é {resultado}, senhor."

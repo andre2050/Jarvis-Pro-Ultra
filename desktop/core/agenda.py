@@ -127,6 +127,20 @@ def cancelar(ident: int) -> str:
     return f"não encontrei o aviso #{ident}, senhor — veja em listar_agenda."
 
 
+def de_hoje() -> list:
+    """[(hora "HH:MM", motivo)] dos avisos agendados pra hoje — pro briefing."""
+    hoje = datetime.now().date().isoformat()
+    achados = []
+    for a in _load().get("avisos", []):
+        try:
+            quando = datetime.fromisoformat(a["quando"])
+            if quando.date().isoformat() == hoje:
+                achados.append((quando.strftime("%H:%M"), a["motivo"]))
+        except Exception:
+            pass
+    return achados
+
+
 def devidos() -> list:
     """Avisos cuja hora já chegou (inclusive os atrasados de quando o app
     estava fechado). Remove do disco e devolve [(motivo, quando_iso)]."""

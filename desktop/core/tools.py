@@ -74,6 +74,10 @@ def declarations() -> list:
               {"type": "object", "properties": {"id": {"type": "number", "description": "Id do aviso em listar_agenda"}}, "required": ["id"]}),
         _decl("ver_tela", "Lê a tela do computador: tira um print e descreve/transcreve o que está nela (erro, texto, janela). Requer o cérebro na nuvem com chave válida.",
               {"type": "object", "properties": {"pergunta": {"type": "string", "description": "O que observar ou responder sobre a tela (opcional)"}}}),
+        _decl("procurar_arquivos", "Procura arquivos no PC por nome (ou parte dele) nas pastas do usuário (Desktop, Documentos, Downloads, Imagens, Músicas, Vídeos) e devolve até 10 resultados com o caminho completo. Use quando o senhor perguntar 'onde está o arquivo X'.",
+              {"type": "object", "properties": {"nome": {"type": "string", "description": "Nome ou parte do nome do arquivo"}, "pasta": {"type": "string", "enum": ["todas", "desktop", "documentos", "downloads", "imagens", "musicas", "videos"], "description": "Onde procurar (opcional; padrão: todas)"}}, "required": ["nome"]}),
+        _decl("controlar_midia", "Controla o player de mídia do PC (o que estiver tocando: Spotify, YouTube no navegador, Media Player): play/pause, próxima faixa ou faixa anterior.",
+              {"type": "object", "properties": {"acao": {"type": "string", "enum": ["play_pause", "proxima", "anterior"], "description": "Ação do player"}}, "required": ["acao"]}),
     ]
 
 
@@ -85,7 +89,8 @@ def nomes() -> set:
             "tocar_musica", "controlar_volume", "pesquisar_web", "abrir_site",
             "abrir_app", "lembrar_fato", "listar_memorias", "definir_timer",
             "desfazer_ultima_acao", "agendar_aviso", "listar_agenda",
-            "cancelar_aviso", "ver_tela"}
+            "cancelar_aviso", "ver_tela", "procurar_arquivos",
+            "controlar_midia"}
 
 
 def execute(name: str, args: dict) -> str:
@@ -108,6 +113,8 @@ def execute(name: str, args: dict) -> str:
         "listar_agenda": lambda: agenda.listar(),
         "cancelar_aviso": lambda: agenda.cancelar(args.get("id", 0)),
         "ver_tela": lambda: _ver_tela(args.get("pergunta", "")),
+        "procurar_arquivos": lambda: _procurar_arquivos(args.get("nome", ""), args.get("pasta", "todas")),
+        "controlar_midia": lambda: _controlar_midia(args.get("acao", "play_pause")),
     }.get(name)
     if fn is None:
         return f"tool desconhecida: {name}"
@@ -410,3 +417,86 @@ def _ver_tela(pergunta: str) -> str:
         return gemini_client.vision(_cfg["gemini_api_key"], prompt, b64)
     except Exception as e:
         return f"não consegui enxergar a tela, senhor: {e}"
+
+
+# ==================== BUSCA DE ARQUIVOS (v4.13.0) ====================
+
+def _pastas_usuario() -> dict:
+    from pathlib import Path
+    home = Path.home()
+    return {
+        "desktop": home / "Desktop",
+        "documentos": home / "Documents",
+        "downloads": home / "Downloads",
+        "imagens": home / "Pictures",
+        "musicas": home / "Music",
+        "videos": home / "Videos",
+    }
+
+
+def _norm_txt(t: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFD", (t or "").lower()).encode(
+        "ascii", "ignore").decode()
+
+
+def _procurar_arquivos(nome: str, pasta: str = "todas") -> str:
+    """Procura por nome (sem acento/caixa) nas pastas do usuário, com
+    timeout de segurança pra não varrer o PC inteiro."""
+    import os
+    import time as _t
+    from pathlib import Path
+    alvo = _norm_txt(nome)
+    if not alvo:
+        return "diga o nome (ou parte dele) do arquivo, senhor."
+    pastas = _pastas_usuario()
+    if pasta in pastas:
+        bases = [pastas[pasta]]
+    else:
+        bases = [p for p in pastas.values() if p.exists()]
+    achados = []
+    limite = _t.time() + 3.5  # teto de varredura: 3,5s
+    for base in bases:
+        if not base.exists():
+            continue
+        for raiz, dirs, arquivos in os.walk(base):
+            if _t.time() > limite:
+                break
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "node_modules"]
+            for f in arquivos:
+                if alvo in _norm_txt(f):
+                    achados.append(Path(raiz) / f)
+                    if len(achados) >= 10:
+                        break
+            if len(achados) >= 10:
+                break
+        if len(achados) >= 10:
+            break
+    if not achados:
+        onde = pasta if pasta in pastas else "nas pastas do usuário"
+        return f"Nenhum arquivo com '{nome}' em {onde}, senhor."
+    linhas = [f"- {a}" for a in achados]
+    return f"{len(achados)} arquivo(s) encontrado(s) com '{nome}':\n" + "\n".join(linhas)
+
+
+# ==================== CONTROLE DE MÍDIA (v4.13.0) ====================
+
+def _controlar_midia(acao: str) -> str:
+    """Play/pause, próxima e anterior nas teclas de mídia do teclado —
+    controla QUALQUER player que esteja tocando (Spotify, YouTube, WMP)."""
+    import sys
+    acao = acao or "play_pause"
+    if acao not in ("play_pause", "proxima", "anterior"):
+        return f"ação inválida '{acao}': use play_pause, proxima ou anterior."
+    if sys.platform.startswith("win"):
+        import ctypes
+        vks = {"play_pause": 0xB3, "proxima": 0xB0, "anterior": 0xB1}
+        vk = vks[acao]
+        ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(vk, 0, 2, 0)  # KEYEVENTF_KEYUP
+        msgs = {"play_pause": "play/pause enviado, senhor",
+                "proxima": "próxima faixa, senhor",
+                "anterior": "faixa anterior, senhor"}
+        return msgs[acao] + "."
+    return ("o controle de mídia por tecla funciona no Windows, senhor — "
+            "neste sistema eu ainda não consigo apertar as teclas de mídia.")

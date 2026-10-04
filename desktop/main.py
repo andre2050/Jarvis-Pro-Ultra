@@ -14,7 +14,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-from core import agenda, brain, config, intents, tools, confirm
+from core import agenda, brain, briefing, config, intents, tools, confirm
 from core.action_loader import discover_actions
 from core.adapters import PlayerAdapter, SessionMemoryAdapter
 from core.config import sync_api_keys
@@ -56,6 +56,9 @@ class JarvisApp(tk.Tk):
         # v4.12.0: viga dos avisos agendados (agenda.json em disco) — os
         # atrasados de quando o app estava fechado disparam no boot
         threading.Thread(target=self._vigia_agenda, daemon=True).start()
+
+        # v4.13.0: briefing matinal — bom-dia com clima e agenda (1x/dia)
+        self.after(2500, self._briefing_do_boot)
 
         # ---------- FUSÃO MARK LIII: registro de ações auto-descritivas ----------
         self.registro = discover_actions(
@@ -460,6 +463,10 @@ class JarvisApp(tk.Tk):
                     _, frase = item
                     self.chat.add("sistema", f"« {frase} »")
                     self.voz.falar(frase)
+                elif isinstance(item, tuple) and item[0] == "briefing":
+                    _, msg = item
+                    self.chat.add("jarvis", msg)
+                    self.voz.falar(msg)
                 elif isinstance(item, tuple) and item[0] == "agenda":
                     motivo, quando = item[1]
                     atrasado = ""
@@ -505,6 +512,16 @@ class JarvisApp(tk.Tk):
             self.voz.falar(resposta)
         self._ocupado = False
         self._status("pronto")
+
+    def _briefing_do_boot(self):
+        """v4.13.0: primeira abertura do dia (a partir das 5h) ganha o
+        briefing falado — clima, agenda de hoje e última memória."""
+        try:
+            msg = briefing.do_boot()
+            if msg:
+                self.fila_eventos.put(("briefing", msg))
+        except Exception:
+            pass
 
     def _vigia_agenda(self):
         """v4.12.0: confere os avisos agendados a cada 20s (thread daemon)."""

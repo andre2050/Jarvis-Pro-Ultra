@@ -278,7 +278,8 @@ class PainelConfig(tk.Toplevel):
         txt_cat.insert("1.0",
             "Comandos rápidos (respondem na hora, até offline):\n"
             "  'que horas são' · 'que dia é hoje' · 'status do pc' · 'abre o bloco de notas'\n"
-            "  'toca música de rock' · 'aumenta o volume' · 'me avisa em 10 minutos pra sair'\n\n"
+            "  'toca música de rock' · 'aumenta o volume' · 'me avisa em 10 minutos pra sair'\n"
+            "  'às 18:30 me avisa do boleto' · 'quanto é 15*3' · 'briefing' · 'pausa a música'\n\n"
             "Tools do cérebro (nuvem ou offline):\n" + "\n".join(linhas))
         txt_cat.configure(state=tk.DISABLED)
 
