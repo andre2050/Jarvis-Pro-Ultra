@@ -40,7 +40,7 @@ class JarvisApp(tk.Tk):
         self.minsize(960, 660)
 
         self.cfg = config.load()
-        theme.usar(self.cfg.get("tema", "radar"))
+        theme.usar(self.cfg.get("tema", "sentinela"))
         self.cor = theme.cor            # paleta do tema ativo (muda em ⚙ CONFIG)
         self.configure(bg=self.cor("janela_bg"))  # só agora, com o tema já certo
         sync_api_keys(self.cfg)          # ações do Mark LIII leem config/api_keys.json

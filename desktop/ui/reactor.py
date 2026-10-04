@@ -39,6 +39,17 @@ _NOVOSKIN_OLHO_D = (0.605, 0.309)
 _NOVOSKIN_REATOR = (0.499, 0.812)
 _NOVOSKIN_BOCA = (0.502, 0.400)
 
+# v4.14.1: skin "sentinela" — cabeça de robô com fones vermelhos dentro de um
+# HUD circular (arte IA a partir da foto de referência do André). Posições
+# calibradas por análise de pixel: olhos cyan brilhantes, fones vermelhos,
+# visor (boca estimada).
+_ASSET_SENTINELA = Path(__file__).resolve().parent.parent / "assets" / "sentinela_hud.png"
+_SENTINELA_OLHO_E = (0.393, 0.428)
+_SENTINELA_OLHO_D = (0.599, 0.428)
+_SENTINELA_BOCA = (0.500, 0.560)
+_SENTINELA_FONE_E = (0.330, 0.505)
+_SENTINELA_FONE_D = (0.668, 0.505)
+
 # v5.0.0: cores vêm do tema ativo (ui/theme.py) — azul clássico, vermelho ou gold
 from ui import theme as _tema
 
@@ -76,6 +87,8 @@ class ArcReactorHud(tk.Canvas):
         self._visema = 0.0   # v4.10.3-desktop: boca do busto anima por palavras faladas
         self._img_novoskin = None    # v4.10.9: cache do PhotoImage (lazy, 1x por tamanho)
         self._img_novoskin_erro = False
+        self._img_sentinela = None  # v4.14.1: cache da skin sentinela
+        self._img_sentinela_erro = False
 
         self._t0 = time.time()
         self._bat = None
@@ -122,6 +135,8 @@ class ArcReactorHud(tk.Canvas):
             self._frame_busto(cx, cy, r, el)
         elif _tema.atual() == "novoskin":
             self._frame_novoskin(cx, cy, r, el)
+        elif _tema.atual() == "sentinela":
+            self._frame_sentinela(cx, cy, r, el)
         else:
             self._frame_arc(cx, cy, r, el)
 
@@ -502,6 +517,132 @@ class ArcReactorHud(tk.Canvas):
             txt += f"  ·  {self._bat}%"
         else:
             txt += f"  ·  CPU {self._cpu:.0f}%"
+        self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
+                         fill=_T("dim"))
+
+    def _carregar_sentinela(self):
+        """Carrega a arte da sentinela UMA vez por tamanho de canvas (lazy).
+        Sem Pillow ou sem o arquivo, degrada pro radar circular — nunca quebra."""
+        if self._img_sentinela is not None or self._img_sentinela_erro:
+            return self._img_sentinela
+        if not TEM_PIL or not _ASSET_SENTINELA.exists():
+            self._img_sentinela_erro = True
+            return None
+        try:
+            im = Image.open(_ASSET_SENTINELA).convert("RGB")
+            im = im.resize((int(self.size), int(self.size)), Image.LANCZOS)
+            self._img_sentinela = ImageTk.PhotoImage(im)
+        except Exception:
+            self._img_sentinela_erro = True
+            self._img_sentinela = None
+        return self._img_sentinela
+
+    def _frame_sentinela(self, cx, cy, r, el):
+        """SENTINELA (v4.14.1): a interface circular da foto do André — cabeça
+        de robô com fones vermelhos no centro de um HUD de anéis cyan, com
+        os overlays animados do JARVIS por cima: varredura girando no anel
+        externo, olhos pulsando, visor animado por visema, fones com brilho
+        vermelho respirando. Sem Pillow/arquivo, degrada pro radar."""
+        img = self._carregar_sentinela()
+        if img is None:
+            self._frame_radar(cx, cy, r, el)
+            return
+
+        cyan = _T("vivo")
+        teal = _T("principal")
+        glows = _tema.cores()["glows"]
+        tam = self.size
+        VERM = "#ff4238"
+
+        self.create_image(cx, cy, image=img)  # arte de base (anchor=center)
+
+        # ---- varredura girando no anel externo (velocidade por estado) ----
+        periodo = 0.9 if self.thinking else (6 if self.listening else 14)
+        sweep = (el / periodo) * 360
+        bbox = (cx - r * 0.90, cy - r * 0.90, cx + r * 0.90, cy + r * 0.90)
+        for larg, stipp in ((85, "gray12"), (50, "gray25"), (26, "gray50")):
+            self.create_arc(bbox, start=sweep - larg, extent=larg,
+                            style=tk.CHORD, fill=cyan, outline="", stipple=stipp)
+
+        # ---- aura quando falando ou ouvindo ----
+        if self.speaking or self.listening:
+            raio = r * (0.94 + 0.02 * math.sin(el * 6))
+            self.create_oval(cx - raio, cy - raio, cx + raio, cy + raio,
+                             outline=teal, width=2, stipple="gray50")
+
+        # ---- olhos cyan: brilho pulsante nas posições calibradas ----
+        pulso_olho = 0.5 + 0.5 * math.sin(el * 2.2)
+        if self.thinking or self.listening:
+            pulso_olho = 0.7 + 0.3 * math.sin(el * 5)
+        if self.speaking:
+            pulso_olho = 0.6 + 0.4 * self._visema   # olhos "falam" junto com a voz
+        rr_olho = tam * (0.026 + 0.008 * pulso_olho)
+        for (nx, ny) in (_SENTINELA_OLHO_E, _SENTINELA_OLHO_D):
+            ox, oy = nx * tam, ny * tam
+            self.create_oval(ox - rr_olho, oy - rr_olho, ox + rr_olho, oy + rr_olho,
+                             fill=glows[4], outline="", stipple="gray50")
+            self.create_oval(ox - rr_olho * 0.45, oy - rr_olho * 0.45,
+                             ox + rr_olho * 0.45, oy + rr_olho * 0.45,
+                             fill=cyan, outline="")
+
+        # ---- visor/boca: ripas cyan que se abrem com o visema ----
+        boca = 2 + self._visema * r * 0.085
+        if self.speaking and self._visema < 0.15:
+            boca = 2 + r * 0.010 * (1 + math.sin(el * 18))
+        bmx, bmy = _SENTINELA_BOCA[0] * tam, _SENTINELA_BOCA[1] * tam
+        bx1, bx2 = bmx - r * 0.12, bmx + r * 0.12
+        for i in range(3):
+            yy = bmy - boca + i * boca
+            self.create_line(bx1, yy, bx2, yy, fill=glows[3], width=2)
+
+        # ---- fones vermelhos: brilho respirando (identidade da foto) ----
+        pulso_f = 0.5 + 0.5 * math.sin(el * 1.9)
+        for (nx, ny) in (_SENTINELA_FONE_E, _SENTINELA_FONE_D):
+            fx, fy = nx * tam, ny * tam
+            fr = r * (0.055 + 0.008 * pulso_f)
+            self.create_oval(fx - fr, fy - fr, fx + fr, fy + fr,
+                             outline=VERM, width=2, stipple="gray50")
+
+        # ---- scan pensando (varre o visor) + retículo ouvindo ----
+        if self.thinking:
+            ys = (_SENTINELA_OLHO_E[1] * tam) + (r * 0.35) * ((el * 0.4) % 1.0)
+            self.create_line(cx - r * 0.30, ys, cx + r * 0.30, ys,
+                             fill=teal, width=2, stipple="gray50")
+        if self.listening:
+            self.create_oval(cx - r * 0.62, cy - r * 0.62, cx + r * 0.62, cy + r * 0.62,
+                             outline=teal, width=1.5, stipple="gray25")
+
+        # ---- blips orbitais nos anéis (acendem quando a varredura passa) ----
+        for i in range(6):
+            b_ang = (i * 61 + 17) % 360
+            a = math.radians(b_ang)
+            bd = 0.80 + (i % 2) * 0.05
+            bx, by = cx + r * bd * math.cos(a), cy + r * bd * math.sin(a)
+            atraso = (sweep - b_ang) % 360
+            brilho = max(0.0, 1.0 - atraso / 360)
+            if brilho <= 0.02:
+                continue
+            raio_b = 1.6 + 2.4 * brilho
+            self.create_oval(bx - raio_b, by - raio_b, bx + raio_b, by + raio_b,
+                             fill=cyan if brilho > 0.55 else glows[min(len(glows)-1, int(brilho*len(glows)))],
+                             outline="")
+
+        # ---- partículas subindo devagar ----
+        for i in range(7):
+            pr = r * (0.5 + 0.45 * ((i * 0.137 + el * 0.05) % 1.0))
+            pa = el * 0.4 + i * 2.3
+            px, py = cx + pr * math.cos(pa), cy + pr * math.sin(pa) * 0.9
+            self.create_oval(px - 1.5, py - 1.5, px + 1.5, py + 1.5,
+                             fill=glows[2], outline="")
+
+        # ---- leitura viva embaixo (bateria/CPU, hora) ----
+        import datetime as _dt
+        agora = _dt.datetime.now()
+        txt = agora.strftime("%H:%M") + f" · {agora.day} DE {SEMANA[agora.weekday()]}"
+        if self._bat is not None:
+            txt += f" · {self._bat}%"
+        elif self._cpu is not None:
+            txt += f" · CPU {self._cpu:.0f}%"
         self.create_text(cx, cy + r * 0.97, text=txt, font=("Consolas", 9),
                          fill=_T("dim"))
 

@@ -13,7 +13,7 @@ DEFAULTS = {
     "usuario": "senhor",
     "cerebro": "gemini",       # "gemini" (nuvem) | "ollama" (100% offline)
     "ollama_model": "",        # ex: "llama3.2" — escolhido em ⚙ CONFIG
-    "tema": "novoskin",        # "novoskin" (padrão) | "busto" | "radar" | "classico" | "vermelho" | "gold"
+    "tema": "sentinela",      # "sentinela" (padrão v4.14.1) | "novoskin" | "busto" | "radar" | "classico" | "vermelho" | "gold"
     "voz_id": "",              # v5.1.8: voz escolhida em ⚙ CONFIG ("" = automática)
     "voz_natwin": True,        # v4.10.6: Windows prefere TTS nativo (mais confiável)
 }
@@ -36,6 +36,13 @@ def load() -> dict:
     if existia and not cfg.get("_skin_migrada_v4104") and cfg.get("tema") == "busto":
         cfg["tema"] = "novoskin"
     cfg["_skin_migrada_v4104"] = True
+    # v4.14.1: André pediu a interface circular do robô com fones vermelhos
+    # (foto de referência) — skin "sentinela" vira padrão. Mesma regra da
+    # v4.10.5: só migra quem nunca escolheu tema de propósito (estava no
+    # padrão automático "novoskin"); escolha manual fica intocada pra sempre.
+    if existia and not cfg.get("_skin_migrada_v4141") and cfg.get("tema") == "novoskin":
+        cfg["tema"] = "sentinela"
+    cfg["_skin_migrada_v4141"] = True
     return cfg
 
 

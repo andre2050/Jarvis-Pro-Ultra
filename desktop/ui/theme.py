@@ -6,7 +6,8 @@ Temas:
   - gold      · dourado Stark (MK III)
   - radar     · holograma circular teal com sweep de radar (v5.1.0)
   - busto     · Busto Holográfico wireframe gelo/azul (v4.9.3 Android)
-  - novoskin  · Busto Holográfico cyan/teal com painel HUD lateral (02/10/2026) — PADRÃO
+  - novoskin  · Busto Holográfico cyan/teal com painel HUD lateral (02/10/2026)
+  - sentinela · Robô de fones vermelhos em HUD circular navy/cyan (v4.14.1) — PADRÃO
 """
 TEMAS = {
     "classico": {
@@ -60,6 +61,15 @@ TEMAS = {
         "chat_fundo": "#020607", "fg_dim": "#cdf6f8", "txt_fraco": "#6f9598",
         "txt_claro": "#e5fcfd", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
     },
+    "sentinela": {
+        "principal": "#1ec2e6", "vivo": "#7fe0ff", "dim": "#0e5a75",
+        "escuro": "#0a2530", "fundo": "#04101a",
+        "glows": ["#03121c", "#062030", "#0a3348", "#0f4a66", "#16688c"],
+        "janela_bg": "#030c14", "painel_bg": "#061620", "painel2": "#0b2030",
+        "entrada_bg": "#0d2436", "user_bg": "#123a52", "chat_bg": "#061620",
+        "chat_fundo": "#04101a", "fg_dim": "#cfeaf5", "txt_fraco": "#7f97a8",
+        "txt_claro": "#e8f6fc", "erro_bg": "#2a1212", "erro_fg": "#ff9a8f",
+    },
     "gold": {
         "principal": "#ffb830", "vivo": "#ffd35e", "dim": "#a1730f",
         "escuro": "#3d2c07", "fundo": "#0a0805",
@@ -71,7 +81,7 @@ TEMAS = {
     },
 }
 
-_ativo = "novoskin"  # 02/10/2026: skin cyan/teal pedida pelo André vira o padrão
+_ativo = "sentinela"  # v4.14.1: interface circular do robô com fones vermelhos
 
 
 def usar(nome: str) -> None:

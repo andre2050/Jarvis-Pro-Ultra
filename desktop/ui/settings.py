@@ -212,7 +212,8 @@ class PainelConfig(tk.Toplevel):
         zona_t = tk.Frame(self, bg="#171012")
         zona_t.pack(fill=tk.X, padx=24)
         self.var_tema = tk.StringVar(value=cfg.get("tema", "novoskin"))
-        for rot, desc in (("novoskin", "Busto cyan/teal com painel HUD lateral (padrão)"),
+        for rot, desc in (("sentinela", "Sentinela: robô de fones vermelhos em HUD circular (padrão v4.14.1)"),
+                          ("novoskin", "Busto cyan/teal com painel HUD lateral"),
                           ("busto", "Busto Holográfico wireframe gelo/azul (v4.9.3)"),
                           ("classico", "Azul holográfico (J.A.R.V.I.S original)"),
                           ("vermelho", "Reator de Arco Vermelho (v4.x)"),
